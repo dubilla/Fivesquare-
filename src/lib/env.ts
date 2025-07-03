@@ -9,10 +9,11 @@ const requiredEnvVars = [
   'GOOGLE_MAPS_API_KEY'
 ] as const;
 
-const optionalEnvVars = [
-  'NEXT_PUBLIC_POSTHOG_KEY',
-  'NEXT_PUBLIC_POSTHOG_HOST'
-] as const;
+// Optional environment variables for future use
+// const optionalEnvVars = [
+//   'NEXT_PUBLIC_POSTHOG_KEY',
+//   'NEXT_PUBLIC_POSTHOG_HOST'
+// ] as const;
 
 export function validateEnv() {
   const missing: string[] = [];
