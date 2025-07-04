@@ -83,20 +83,6 @@ Step Notes 0. Bootstrap repo pnpm create next-app@latest --ts --tailwind
 
 ⸻
 
-7. Domain Ideas for Reordr
-
-Domain Quick check\*
-reordr.com (often taken—verify)
-reordr.app
-reordr.io
-getreordr.com
-re-ordr.com
-reordr.co
-
-\*Availability changes constantly—grab one ASAP.
-
-⸻
-
 Everything else is locked. Once you’ve pushed the first commit and stood up the Supabase project, we can iterate rapidly on UX polish, PostHog event tracking, and (next phase) photo uploads.
 
 Ping me whenever you need code snippets, schema tweaks, or roadmap adjustments—happy building!
