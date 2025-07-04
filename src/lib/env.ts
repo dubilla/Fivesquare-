@@ -1,6 +1,7 @@
 /**
  * Environment variable validation
  * Ensures all required environment variables are present
+ * This runs at Next.js startup via next.config.ts
  */
 
 const requiredEnvVars = [
