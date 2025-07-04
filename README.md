@@ -22,11 +22,13 @@ A personal food tracking app that helps you remember what you've ordered at diff
 ## Getting Started
 
 1. Install dependencies:
+
    ```bash
    pnpm install
    ```
 
 2. Copy environment variables:
+
    ```bash
    cp .env.local.example .env.local
    ```
@@ -37,6 +39,7 @@ A personal food tracking app that helps you remember what you've ordered at diff
    - `GOOGLE_MAPS_API_KEY`
 
 4. Run the development server:
+
    ```bash
    pnpm dev
    ```

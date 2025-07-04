@@ -1,5 +1,5 @@
-import type { NextConfig } from "next";
-import { validateEnv } from "./src/lib/env";
+import type { NextConfig } from 'next';
+import { validateEnv } from './src/lib/env';
 
 // Validate environment variables at app startup
 validateEnv();
