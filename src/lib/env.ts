@@ -4,11 +4,7 @@
  * This runs at Next.js startup via next.config.ts
  */
 
-const requiredEnvVars = [
-  'NEXT_PUBLIC_SUPABASE_URL',
-  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-  'GOOGLE_MAPS_API_KEY',
-] as const;
+const requiredEnvVars = ['DATABASE_URL', 'GOOGLE_MAPS_API_KEY'] as const;
 
 // Optional environment variables for future use
 // const optionalEnvVars = [
@@ -50,9 +46,8 @@ export function validateEnv() {
 
 // Export environment variables with proper typing
 export const env = {
-  // Supabase
-  NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+  // Neon database
+  DATABASE_URL: process.env.DATABASE_URL!,
 
   // Google Maps
   GOOGLE_MAPS_API_KEY: process.env.GOOGLE_MAPS_API_KEY!,

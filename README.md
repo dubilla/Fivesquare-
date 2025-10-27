@@ -14,8 +14,8 @@ A personal food tracking app that helps you remember what you've ordered at diff
 - **Framework**: Next.js 15 with App Router
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
-- **Database**: Supabase
-- **Authentication**: Supabase Auth
+- **Database**: Neon (Postgres)
+- **Authentication**: TBD
 - **Maps**: Google Places API
 - **Analytics**: PostHog
 
@@ -34,8 +34,7 @@ A personal food tracking app that helps you remember what you've ordered at diff
    ```
 
 3. Set up your environment variables in `.env.local`:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+   - `DATABASE_URL` (your Neon connection string)
    - `GOOGLE_MAPS_API_KEY`
 
 4. Run the development server:
