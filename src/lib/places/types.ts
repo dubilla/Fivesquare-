@@ -12,6 +12,7 @@ export interface Place {
   lng: number;
   address?: string;
   types?: string[];
+  distance?: number; // Distance in meters from search origin
 }
 
 export interface NearbySearchParams {

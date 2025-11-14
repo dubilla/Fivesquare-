@@ -1,4 +1,5 @@
 import type { PlacesProvider, NearbySearchParams, Place } from './types';
+import { calculateDistance } from './distance';
 
 export class GooglePlacesProvider implements PlacesProvider {
   private apiKey: string;
@@ -53,14 +54,23 @@ export class GooglePlacesProvider implements PlacesProvider {
             geometry: { location: { lat: number; lng: number } };
             vicinity?: string;
             types?: string[];
-          }) => ({
-            place_id: result.place_id,
-            name: result.name,
-            lat: result.geometry.location.lat,
-            lng: result.geometry.location.lng,
-            address: result.vicinity,
-            types: result.types,
-          })
+          }) => {
+            const placeLocation = {
+              lat: result.geometry.location.lat,
+              lng: result.geometry.location.lng,
+            };
+            const distance = calculateDistance(location, placeLocation);
+
+            return {
+              place_id: result.place_id,
+              name: result.name,
+              lat: placeLocation.lat,
+              lng: placeLocation.lng,
+              address: result.vicinity,
+              types: result.types,
+              distance,
+            };
+          }
         );
 
       return places;

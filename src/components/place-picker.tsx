@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import type { Place } from '@/lib/places';
+import { formatDistance } from '@/lib/places/distance';
 
 interface PlacePickerProps {
   onPlaceSelect?: (place: Place) => void;
@@ -200,8 +201,15 @@ export function PlacePicker({
                 onClick={() => handlePlaceSelect(place)}
                 className="w-full text-left px-4 py-3 hover:bg-gray-100 dark:hover:bg-gray-700 border-b border-gray-200 dark:border-gray-700 last:border-b-0 transition-colors"
               >
-                <div className="font-medium text-gray-900 dark:text-white">
-                  {place.name}
+                <div className="flex items-center justify-between">
+                  <div className="font-medium text-gray-900 dark:text-white">
+                    {place.name}
+                  </div>
+                  {place.distance !== undefined && (
+                    <div className="text-sm font-medium text-blue-600 dark:text-blue-400 ml-2">
+                      {formatDistance(place.distance)}
+                    </div>
+                  )}
                 </div>
                 {place.address && (
                   <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">

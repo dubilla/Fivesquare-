@@ -51,6 +51,7 @@ describe('GooglePlacesProvider', () => {
       lng: -73.99,
       address: 'Address 0',
       types: ['restaurant', 'food'],
+      distance: 0,
     });
 
     expect(global.fetch).toHaveBeenCalledWith(
