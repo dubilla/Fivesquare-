@@ -99,7 +99,7 @@ export function PlacePicker({
           lat: loc.lat,
           lng: loc.lng,
           keyword: searchQuery,
-          radius: 5000, // 5km radius
+          radius: 500, // 500m radius
         }),
       });
 
