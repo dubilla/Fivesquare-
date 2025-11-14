@@ -151,4 +151,50 @@ describe('GooglePlacesProvider', () => {
       })
     ).rejects.toThrow('Failed to search nearby places: Network error');
   });
+
+  it('should rank results by hybrid score (proximity + relevance)', async () => {
+    const mockResponse = {
+      status: 'OK',
+      results: [
+        {
+          place_id: 'far_but_relevant',
+          name: 'Far But Relevant',
+          geometry: { location: { lat: 40.74, lng: -73.98 } }, // ~1.4km away
+          vicinity: 'Far Address',
+          types: ['restaurant'],
+        },
+        {
+          place_id: 'very_close',
+          name: 'Very Close',
+          geometry: { location: { lat: 40.7301, lng: -73.9901 } }, // ~100m away
+          vicinity: 'Close Address',
+          types: ['restaurant'],
+        },
+        {
+          place_id: 'medium_distance',
+          name: 'Medium Distance',
+          geometry: { location: { lat: 40.735, lng: -73.985 } }, // ~500m away
+          vicinity: 'Medium Address',
+          types: ['restaurant'],
+        },
+      ],
+    };
+
+    (global.fetch as Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => mockResponse,
+    });
+
+    const provider = new GooglePlacesProvider('test-api-key');
+    const places = await provider.searchNearby({
+      location: { lat: 40.73, lng: -73.99 },
+      radius: 1500,
+    });
+
+    // With hybrid ranking (70% proximity, 30% relevance):
+    // - "Very Close" should rank higher despite being 2nd in Google results
+    // - Proximity matters more than original position
+    expect(places[0].place_id).toBe('very_close');
+    expect(places[0].distance).toBeLessThan(200);
+  });
 });

@@ -1,5 +1,6 @@
 import type { PlacesProvider, NearbySearchParams, Place } from './types';
 import { calculateDistance } from './distance';
+import { calculateHybridScore } from './ranking';
 
 export class GooglePlacesProvider implements PlacesProvider {
   private apiKey: string;
@@ -44,33 +45,59 @@ export class GooglePlacesProvider implements PlacesProvider {
         throw new Error(`Google Places API error: ${data.status}`);
       }
 
-      // Map Google Places results to our common Place interface
-      const places: Place[] = (data.results || [])
-        .slice(0, 10)
-        .map(
-          (result: {
+      // Map Google Places results to our common Place interface with ranking
+      const placesWithScores = (data.results || []).map(
+        (
+          result: {
             place_id: string;
             name: string;
             geometry: { location: { lat: number; lng: number } };
             vicinity?: string;
             types?: string[];
-          }) => {
-            const placeLocation = {
-              lat: result.geometry.location.lat,
-              lng: result.geometry.location.lng,
-            };
-            const distance = calculateDistance(location, placeLocation);
+          },
+          index: number
+        ) => {
+          const placeLocation = {
+            lat: result.geometry.location.lat,
+            lng: result.geometry.location.lng,
+          };
+          const distance = calculateDistance(location, placeLocation);
 
-            return {
-              place_id: result.place_id,
-              name: result.name,
-              lat: placeLocation.lat,
-              lng: placeLocation.lng,
-              address: result.vicinity,
-              types: result.types,
-              distance,
-            };
-          }
+          // Calculate hybrid score (70% proximity, 30% Google relevance)
+          const hybridScore = calculateHybridScore(
+            distance,
+            index,
+            data.results.length,
+            radius || 1500
+          );
+
+          return {
+            place_id: result.place_id,
+            name: result.name,
+            lat: placeLocation.lat,
+            lng: placeLocation.lng,
+            address: result.vicinity,
+            types: result.types,
+            distance,
+            hybridScore,
+          };
+        }
+      );
+
+      // Sort by hybrid score (highest first) and take top 10
+      const places: Place[] = placesWithScores
+        .sort((a, b) => b.hybridScore - a.hybridScore)
+        .slice(0, 10)
+        .map(
+          ({ place_id, name, lat, lng, address, types, distance }): Place => ({
+            place_id,
+            name,
+            lat,
+            lng,
+            address,
+            types,
+            distance,
+          })
         );
 
       return places;
