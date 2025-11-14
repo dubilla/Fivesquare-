@@ -41,5 +41,11 @@ yarn-error.log*
 next-env.d.ts
 
 Backlog.md
+PRD.md
+
+# Private operational docs
+MIGRATIONS.md
+DEPLOYMENT.md
+QUICK-START.md
 
 .claude
