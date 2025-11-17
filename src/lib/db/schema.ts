@@ -4,6 +4,8 @@ import {
   timestamp,
   integer,
   primaryKey,
+  doublePrecision,
+  varchar,
 } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
@@ -60,3 +62,21 @@ export const verificationTokens = pgTable(
     pk: primaryKey({ columns: [table.identifier, table.token] }),
   })
 );
+
+export const checkIns = pgTable('check_ins', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  placeId: text('place_id').notNull(),
+  placeName: text('place_name').notNull(),
+  lat: doublePrecision('lat').notNull(),
+  lng: doublePrecision('lng').notNull(),
+  dishText: varchar('dish_text', { length: 100 }).notNull(),
+  noteText: varchar('note_text', { length: 500 }),
+  visitDatetime: timestamp('visit_datetime', { mode: 'date' }).notNull(),
+  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
+});

@@ -8,6 +8,13 @@
       "when": 1761611774788,
       "tag": "0000_public_peter_quill",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1763344477242,
+      "tag": "0001_lean_swordsman",
+      "breakpoints": true
     }
   ]
 }
