@@ -4,6 +4,14 @@ import userEvent from '@testing-library/user-event';
 import type { Place } from '@/lib/places';
 import CheckInPage from './page';
 
+// Mock next/navigation
+const mockPush = vi.fn();
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: mockPush,
+  }),
+}));
+
 // Mock PlacePicker component
 vi.mock('@/components/place-picker', () => ({
   PlacePicker: ({
@@ -177,9 +185,6 @@ describe('CheckInPage', () => {
         }),
       } as Response);
 
-      // Mock window.alert
-      const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => {});
-
       render(<CheckInPage />);
 
       // Select a place
@@ -226,12 +231,10 @@ describe('CheckInPage', () => {
         noteText: 'Great food!',
       });
 
-      // Should show success alert
+      // Should redirect to history
       await waitFor(() => {
-        expect(alertMock).toHaveBeenCalledWith('Check-in saved successfully!');
+        expect(mockPush).toHaveBeenCalledWith('/history');
       });
-
-      alertMock.mockRestore();
     });
 
     it('should display error message when API call fails', async () => {
@@ -296,15 +299,13 @@ describe('CheckInPage', () => {
       });
     });
 
-    it('should clear form after successful submission', async () => {
+    it('should redirect to history after successful submission', async () => {
       const user = userEvent.setup();
       const mockFetch = vi.mocked(fetch);
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ id: 'checkin-123' }),
       } as Response);
-
-      const alertMock = vi.spyOn(window, 'alert').mockImplementation(() => {});
 
       render(<CheckInPage />);
 
@@ -322,23 +323,10 @@ describe('CheckInPage', () => {
       // Submit
       await user.click(screen.getByRole('button', { name: /save check-in/i }));
 
-      // Wait for success
+      // Wait for redirect
       await waitFor(() => {
-        expect(alertMock).toHaveBeenCalled();
+        expect(mockPush).toHaveBeenCalledWith('/history');
       });
-
-      // Form should be cleared
-      const dishInput = screen.getByPlaceholderText(
-        /margherita pizza/i
-      ) as HTMLInputElement;
-      const noteInput = screen.getByPlaceholderText(
-        /what did you think/i
-      ) as HTMLTextAreaElement;
-
-      expect(dishInput.value).toBe('');
-      expect(noteInput.value).toBe('');
-
-      alertMock.mockRestore();
     });
   });
 });

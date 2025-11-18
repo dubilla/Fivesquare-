@@ -2,6 +2,35 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { db } from '@/lib/db/client';
 import { checkIns } from '@/lib/db/schema';
+import { eq, desc } from 'drizzle-orm';
+
+export async function GET() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const userCheckIns = await db
+      .select()
+      .from(checkIns)
+      .where(eq(checkIns.userId, session.user.id))
+      .orderBy(desc(checkIns.visitDatetime));
+
+    return NextResponse.json({ checkIns: userCheckIns }, { status: 200 });
+  } catch (error) {
+    console.error('Error fetching check-ins:', error);
+
+    if (error instanceof Error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}
 
 export async function POST(request: NextRequest) {
   const session = await auth();

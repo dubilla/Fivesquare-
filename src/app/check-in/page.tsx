@@ -1,10 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { PlacePicker } from '@/components/place-picker';
 import type { Place } from '@/lib/places';
 
 export default function CheckInPage() {
+  const router = useRouter();
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [dishText, setDishText] = useState('');
   const [noteText, setNoteText] = useState('');
@@ -49,13 +51,8 @@ export default function CheckInPage() {
         throw new Error(data.error || 'Failed to create check-in');
       }
 
-      // Success! Redirect to history (will implement later)
-      // For now, just show success and clear form
-      alert('Check-in saved successfully!');
-      setSelectedPlace(null);
-      setDishText('');
-      setNoteText('');
-      // TODO: router.push('/history') when history page exists
+      // Success! Redirect to history
+      router.push('/history');
     } catch (err) {
       setError(
         err instanceof Error ? err.message : 'Failed to create check-in'

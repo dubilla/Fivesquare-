@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
-import { POST } from './route';
+import { GET, POST } from './route';
 import { NextRequest } from 'next/server';
 
 vi.mock('@/auth', () => ({
@@ -9,11 +9,125 @@ vi.mock('@/auth', () => ({
 vi.mock('@/lib/db/client', () => ({
   db: {
     insert: vi.fn(),
+    select: vi.fn(),
   },
 }));
 
 import { auth } from '@/auth';
 import { db } from '@/lib/db/client';
+
+describe('GET /api/checkins', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('should reject unauthenticated requests', async () => {
+    (auth as Mock).mockResolvedValue(null);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(401);
+    expect(data.error).toBe('Unauthorized');
+  });
+
+  it('should return user check-ins in reverse chronological order', async () => {
+    (auth as Mock).mockResolvedValue({
+      user: { id: 'user-123', email: 'test@example.com' },
+      expires: '',
+    });
+
+    const mockCheckIns = [
+      {
+        id: 'checkin-2',
+        userId: 'user-123',
+        placeId: 'place-2',
+        placeName: 'Restaurant 2',
+        lat: 40.74,
+        lng: -73.98,
+        dishText: 'Pasta',
+        noteText: 'Great!',
+        visitDatetime: new Date('2025-01-16'),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+      {
+        id: 'checkin-1',
+        userId: 'user-123',
+        placeId: 'place-1',
+        placeName: 'Restaurant 1',
+        lat: 40.73,
+        lng: -73.99,
+        dishText: 'Pizza',
+        noteText: 'Amazing',
+        visitDatetime: new Date('2025-01-15'),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    ];
+
+    const mockSelect = {
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          orderBy: vi.fn().mockResolvedValue(mockCheckIns),
+        }),
+      }),
+    };
+    (db.select as Mock).mockReturnValue(mockSelect);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.checkIns).toHaveLength(2);
+    expect(data.checkIns[0].dishText).toBe('Pasta');
+    expect(data.checkIns[1].dishText).toBe('Pizza');
+  });
+
+  it('should return empty array when user has no check-ins', async () => {
+    (auth as Mock).mockResolvedValue({
+      user: { id: 'user-123', email: 'test@example.com' },
+      expires: '',
+    });
+
+    const mockSelect = {
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          orderBy: vi.fn().mockResolvedValue([]),
+        }),
+      }),
+    };
+    (db.select as Mock).mockReturnValue(mockSelect);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.checkIns).toEqual([]);
+  });
+
+  it('should handle database errors', async () => {
+    (auth as Mock).mockResolvedValue({
+      user: { id: 'user-123', email: 'test@example.com' },
+      expires: '',
+    });
+
+    const mockSelect = {
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          orderBy: vi.fn().mockRejectedValue(new Error('DB connection failed')),
+        }),
+      }),
+    };
+    (db.select as Mock).mockReturnValue(mockSelect);
+
+    const response = await GET();
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data.error).toBe('DB connection failed');
+  });
+});
 
 describe('POST /api/checkins', () => {
   beforeEach(() => {
