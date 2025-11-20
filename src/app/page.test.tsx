@@ -1,37 +1,80 @@
 import { render, screen } from '@testing-library/react';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Home from './page';
+import type { Session } from 'next-auth';
 
-describe('Home', () => {
-  it('renders the Next.js logo', () => {
-    render(<Home />);
-    const logo = screen.getByAltText('Next.js logo');
-    expect(logo).toBeInTheDocument();
+// Mock next/navigation
+const mockRedirect = vi.fn();
+vi.mock('next/navigation', () => ({
+  redirect: (path: string) => mockRedirect(path),
+}));
+
+// Mock auth
+vi.mock('@/auth', () => ({
+  auth: vi.fn(),
+}));
+
+import { auth } from '@/auth';
+
+describe('Home (Landing Page)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
   });
 
-  it('renders the Deploy now link', () => {
-    render(<Home />);
-    const deployLink = screen.getByRole('link', { name: /deploy now/i });
-    expect(deployLink).toBeInTheDocument();
-    expect(deployLink).toHaveAttribute(
+  it('should redirect authenticated users to /history', async () => {
+    // @ts-expect-error - mocking NextAuth function
+    vi.mocked(auth).mockResolvedValue({
+      user: { id: 'user-123', email: 'test@example.com' },
+      expires: '',
+    } as Session);
+
+    try {
+      await Home();
+    } catch {
+      // Redirect throws, which is expected
+    }
+
+    expect(mockRedirect).toHaveBeenCalledWith('/history');
+  });
+
+  it('should show landing page for unauthenticated users', async () => {
+    // @ts-expect-error - mocking NextAuth function
+    vi.mocked(auth).mockResolvedValue(null);
+
+    const component = await Home();
+    render(component);
+
+    expect(screen.getByText('Reordr')).toBeInTheDocument();
+    expect(
+      screen.getByText('Never forget what you ordered')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Get Started' })).toHaveAttribute(
       'href',
-      expect.stringContaining('vercel.com/new')
+      '/login'
     );
   });
 
-  it('renders the Read our docs link', () => {
-    render(<Home />);
-    const docsLink = screen.getByRole('link', { name: /read our docs/i });
-    expect(docsLink).toBeInTheDocument();
-    expect(docsLink).toHaveAttribute(
-      'href',
-      expect.stringContaining('nextjs.org/docs')
-    );
+  it('should display feature cards', async () => {
+    // @ts-expect-error - mocking NextAuth function
+    vi.mocked(auth).mockResolvedValue(null);
+
+    const component = await Home();
+    render(component);
+
+    expect(screen.getByText('Track Dishes')).toBeInTheDocument();
+    expect(screen.getByText('Remember Favorites')).toBeInTheDocument();
+    expect(screen.getByText('Build History')).toBeInTheDocument();
   });
 
-  it('renders the getting started text', () => {
-    render(<Home />);
-    const gettingStartedText = screen.getByText(/get started by editing/i);
-    expect(gettingStartedText).toBeInTheDocument();
+  it('should have Get Started button linking to login', async () => {
+    // @ts-expect-error - mocking NextAuth function
+    vi.mocked(auth).mockResolvedValue(null);
+
+    const component = await Home();
+    render(component);
+
+    const getStartedButton = screen.getByRole('link', { name: 'Get Started' });
+    expect(getStartedButton).toBeInTheDocument();
+    expect(getStartedButton).toHaveAttribute('href', '/login');
   });
 });
