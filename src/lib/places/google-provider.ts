@@ -46,7 +46,8 @@ export class GooglePlacesProvider implements PlacesProvider {
       }
 
       // Map Google Places results to our common Place interface with ranking
-      const placesWithScores = (data.results || []).map(
+      type PlaceWithScore = Place & { hybridScore: number };
+      const placesWithScores: PlaceWithScore[] = (data.results || []).map(
         (
           result: {
             place_id: string;
@@ -56,7 +57,7 @@ export class GooglePlacesProvider implements PlacesProvider {
             types?: string[];
           },
           index: number
-        ) => {
+        ): PlaceWithScore => {
           const placeLocation = {
             lat: result.geometry.location.lat,
             lng: result.geometry.location.lng,
