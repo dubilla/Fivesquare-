@@ -10,6 +10,11 @@ jobs:
   quality-checks:
     runs-on: ubuntu-latest
 
+    env:
+      DATABASE_URL: postgresql://test:test@localhost:5432/test
+      GOOGLE_MAPS_API_KEY: test_key_for_ci
+      AUTH_SECRET: test_secret_for_ci_minimum_32_characters_long
+
     steps:
       - uses: actions/checkout@v4
 
