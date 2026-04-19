@@ -47,7 +47,7 @@ A personal food tracking app that helps you remember what you've ordered at diff
 
 ## Development
 
-This project follows the MVP roadmap outlined in `Backlog.md`. See `PRD.md` for detailed product requirements.
+This project follows the MVP roadmap outlined in `Todo.md`. See `PRD.md` for detailed product requirements.
 
 ## License
 
