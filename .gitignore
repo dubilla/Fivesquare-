@@ -30,6 +30,9 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+# dev server logs (agent reads logs/dev.log)
+/logs
+
 # env files (can opt-in for committing if needed)
 .env*
 
