@@ -15,6 +15,13 @@
       "when": 1763344477242,
       "tag": "0001_lean_swordsman",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783891514851,
+      "tag": "0002_normal_phantom_reporter",
+      "breakpoints": true
     }
   ]
 }

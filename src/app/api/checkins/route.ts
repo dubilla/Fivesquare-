@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { db } from '@/lib/db/client';
 import { checkIns } from '@/lib/db/schema';
+import { VERDICTS, isVerdict } from '@/lib/verdict';
 import { eq, desc } from 'drizzle-orm';
 
 export async function GET() {
@@ -40,8 +41,16 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { placeId, placeName, lat, lng, dishText, noteText, visitDatetime } =
-      body;
+    const {
+      placeId,
+      placeName,
+      lat,
+      lng,
+      dishText,
+      noteText,
+      verdict,
+      visitDatetime,
+    } = body;
 
     if (!placeId || typeof placeId !== 'string') {
       return NextResponse.json(
@@ -100,6 +109,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Verdict is required on new check-ins going forward (legacy rows are null).
+    if (!isVerdict(verdict)) {
+      return NextResponse.json(
+        {
+          error: `verdict is required and must be one of: ${VERDICTS.join(', ')}`,
+        },
+        { status: 400 }
+      );
+    }
+
     const visitDate = visitDatetime ? new Date(visitDatetime) : new Date();
     if (isNaN(visitDate.getTime())) {
       return NextResponse.json(
@@ -118,6 +137,7 @@ export async function POST(request: NextRequest) {
         lng,
         dishText,
         noteText: noteText || null,
+        verdict,
         visitDatetime: visitDate,
       })
       .returning();

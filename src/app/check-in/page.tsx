@@ -3,6 +3,8 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PlacePicker } from '@/components/place-picker';
+import { VerdictControl } from '@/components/verdict-control';
+import type { Verdict } from '@/lib/verdict';
 import type { Place } from '@/lib/places';
 
 export default function CheckInPage() {
@@ -10,6 +12,7 @@ export default function CheckInPage() {
   const [selectedPlace, setSelectedPlace] = useState<Place | null>(null);
   const [dishText, setDishText] = useState('');
   const [noteText, setNoteText] = useState('');
+  const [verdict, setVerdict] = useState<Verdict | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -24,6 +27,11 @@ export default function CheckInPage() {
 
     if (!dishText.trim()) {
       setError('Please enter a dish name');
+      return;
+    }
+
+    if (!verdict) {
+      setError('Please choose whether you’d order this again');
       return;
     }
 
@@ -42,6 +50,7 @@ export default function CheckInPage() {
           lng: selectedPlace.lng,
           dishText: dishText.trim(),
           noteText: noteText.trim() || null,
+          verdict,
           visitDatetime: new Date().toISOString(),
         }),
       });
@@ -104,6 +113,18 @@ export default function CheckInPage() {
             </div>
           </div>
 
+          {/* Verdict — the most important input on the form */}
+          <div>
+            <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Would you order this again? *
+            </span>
+            <VerdictControl
+              value={verdict}
+              onChange={setVerdict}
+              ariaLabel="Would you order this again?"
+            />
+          </div>
+
           {/* Note Text */}
           <div>
             <label
@@ -136,7 +157,7 @@ export default function CheckInPage() {
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={loading || !selectedPlace || !dishText.trim()}
+            disabled={loading || !selectedPlace || !dishText.trim() || !verdict}
             className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white font-medium py-3 px-4 rounded-lg transition-colors"
           >
             {loading ? 'Saving...' : 'Save Check-In'}
