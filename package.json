@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "mkdir -p logs && truncate -s 0 logs/dev.log && next dev --turbopack 2>&1 | tee logs/dev.log",
     "build": "next build",
+    "vercel-build": "node scripts/migrate-on-deploy.mjs && next build",
     "start": "next start",
     "lint": "next lint",
     "lint:fix": "next lint --fix",

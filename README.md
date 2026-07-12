@@ -49,7 +49,24 @@ Brand: **The Usual**. "Fivesquare" remains the in-house project/repo codename.
 
 ## Development
 
-This project follows the MVP roadmap outlined in `Todo.md`. See `PRD.md` for detailed product requirements.
+This project follows the roadmap in `BACKLOG.md` — one story per PR, shipped in order.
+
+## Deployment
+
+Hosted on **Vercel** (project `fivesquareapp`), backed by **Neon** Postgres. Deploys are driven by the Vercel GitHub integration:
+
+- **Open a PR** → preview deployment.
+- **Merge to `main`** → production deployment.
+
+**Database migrations run automatically on production deploys.** The `vercel-build` script runs `scripts/migrate-on-deploy.mjs` (which applies pending Drizzle migrations via `drizzle-kit migrate`) before `next build`. Migrations only run when `VERCEL_ENV=production`; preview and local builds skip them, so a preview never mutates the production database.
+
+Because migrations run inside the production build, keep them **backward-compatible** (expand-only: add nullable columns, widen types) so the currently-live version keeps working while the new build is created and promoted. Destructive changes (dropping a column) should be split across two deploys.
+
+To apply migrations manually against any database:
+
+```bash
+DATABASE_URL="<connection-string>" pnpm exec drizzle-kit migrate
+```
 
 ## License
 
