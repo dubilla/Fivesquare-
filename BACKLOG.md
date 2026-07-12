@@ -1,6 +1,8 @@
-# Fivesquare Backlog
+# The Usual — Backlog
 
-**Product thesis:** Yelp/Foursquare remember _places_; Fivesquare remembers _what you ordered there and whether you'd order it again_. The core question the app must answer instantly: _"I'm at (or near) this place — what did I get last time, and was it good?"_
+_Brand: **The Usual** ("I'll have the usual"). "Fivesquare" remains the in-house project/repo codename._
+
+**Product thesis:** Yelp/Foursquare remember _places_; The Usual remembers _what you ordered there and whether you'd order it again_. The core question the app must answer instantly: _"I'm at (or near) this place — what did I get last time, and was it good?"_
 
 **Secondary goal:** use the problem to explore geographic data modeling (place normalization, PostGIS, spatial indexing) — but only when a user-facing feature needs it.
 
@@ -20,19 +22,20 @@
 
 ### S1 · Identity & honesty pass
 
-**User sees:** The app is called Fivesquare everywhere — browser tab, landing page, login. The landing page describes what the app actually does today (no photos claim).
+**User sees:** The app is called **The Usual** everywhere — browser tab, landing page, login. The landing page describes what the app actually does today (no photos claim).
 
 **Scope**
 
 - Rename package from `nextjs-temp`; set real `metadata` (title, description) in the root layout; favicon if trivial.
-- Rewrite landing copy around the real pitch ("remember what you ordered and whether you'd order it again"). Remove the photos claim until S9 ships.
+- Rewrite landing copy around the brand's core sentence — "I'll have the usual." Pitch: remember what you ordered and whether you'd order it again; find your usual. Remove the photos claim until S9 ships.
+- Brand voice notes for later stories: verdict copy can lean on the name ("Make it your usual" for a Yes; S2 may use this).
 - Sweep any remaining scaffold text.
 
 **Not in scope:** logo design, custom fonts, redesign. Copy and metadata only.
 
 **Acceptance**
 
-- Tab title reads Fivesquare on every page; landing page makes no false claims.
+- Tab title reads The Usual on every page; landing page makes no false claims.
 
 ---
 
