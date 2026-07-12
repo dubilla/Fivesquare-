@@ -4,7 +4,7 @@
   "private": true,
   "packageManager": "pnpm@9.15.4",
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "mkdir -p logs && truncate -s 0 logs/dev.log && next dev --turbopack 2>&1 | tee logs/dev.log",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
