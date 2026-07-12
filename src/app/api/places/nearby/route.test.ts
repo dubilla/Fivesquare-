@@ -96,14 +96,14 @@ describe('POST /api/places/nearby', () => {
         name: 'Prince St Pizza',
         lat: 40.7229,
         lng: -73.9949,
-        address: '27 Prince St, New York',
+        formattedAddress: '27 Prince St, New York',
       },
       {
         place_id: 'ChIJrTLr-GyuEmsRBfy61i59si0',
         name: "Joe's Pizza",
         lat: 40.7308,
         lng: -74.0022,
-        address: '7 Carmine St, New York',
+        formattedAddress: '7 Carmine St, New York',
       },
     ];
 

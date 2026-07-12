@@ -27,7 +27,7 @@ vi.mock('@/components/place-picker', () => ({
             name: 'Test Restaurant',
             lat: 40.73,
             lng: -73.99,
-            address: 'Test Address',
+            formattedAddress: 'Test Address',
           })
         }
       >
