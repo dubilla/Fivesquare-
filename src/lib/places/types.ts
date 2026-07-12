@@ -10,7 +10,9 @@ export interface Place {
   name: string;
   lat: number;
   lng: number;
-  address?: string;
+  formattedAddress?: string;
+  /** Google's single best-guess category, e.g. "pizza_restaurant" (S5 persists this). */
+  primaryType?: string;
   types?: string[];
   distance?: number; // Distance in meters from search origin
 }

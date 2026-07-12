@@ -211,9 +211,9 @@ export function PlacePicker({
                     </div>
                   )}
                 </div>
-                {place.address && (
+                {place.formattedAddress && (
                   <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                    {place.address}
+                    {place.formattedAddress}
                   </div>
                 )}
               </button>
@@ -238,9 +238,9 @@ export function PlacePicker({
           <div className="font-semibold text-gray-900 dark:text-white">
             {selectedPlace.name}
           </div>
-          {selectedPlace.address && (
+          {selectedPlace.formattedAddress && (
             <div className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-              {selectedPlace.address}
+              {selectedPlace.formattedAddress}
             </div>
           )}
           <div className="text-xs text-gray-500 dark:text-gray-500 mt-2">

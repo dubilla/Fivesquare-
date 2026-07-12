@@ -41,7 +41,7 @@ describe('Places Provider Abstraction Layer', () => {
             name: 'Mock Restaurant',
             lat: params.location.lat,
             lng: params.location.lng,
-            address: 'Mock Address',
+            formattedAddress: 'Mock Address',
           },
         ];
       }
@@ -102,7 +102,7 @@ describe('Places Provider Abstraction Layer', () => {
             name: 'Mapbox Place',
             lat: params.location.lat,
             lng: params.location.lng,
-            address: 'Mapbox Address',
+            formattedAddress: 'Mapbox Address',
           },
         ];
       }
@@ -133,7 +133,7 @@ describe('Places Provider Abstraction Layer', () => {
             name: `${keyword || 'default'} - ${type || 'any'}`,
             lat: location.lat,
             lng: location.lng,
-            address: `Radius: ${radius || 'default'}`,
+            formattedAddress: `Radius: ${radius || 'default'}`,
           },
         ];
       }
@@ -150,7 +150,7 @@ describe('Places Provider Abstraction Layer', () => {
     });
 
     expect(results[0].name).toBe('pizza - restaurant');
-    expect(results[0].address).toBe('Radius: 5000');
+    expect(results[0].formattedAddress).toBe('Radius: 5000');
   });
 
   it('should return consistent Place object structure across providers', async () => {
@@ -175,7 +175,7 @@ describe('Places Provider Abstraction Layer', () => {
             name: 'Place 2',
             lat: params.location.lat,
             lng: params.location.lng,
-            address: 'Optional address',
+            formattedAddress: 'Optional address',
             types: ['restaurant'],
           },
         ];
