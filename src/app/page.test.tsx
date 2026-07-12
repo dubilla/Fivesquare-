@@ -44,10 +44,8 @@ describe('Home (Landing Page)', () => {
     const component = await Home();
     render(component);
 
-    expect(screen.getByText('Reordr')).toBeInTheDocument();
-    expect(
-      screen.getByText('Never forget what you ordered')
-    ).toBeInTheDocument();
+    expect(screen.getByText('The Usual')).toBeInTheDocument();
+    expect(screen.getByText(`"I'll have the usual."`)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Get Started' })).toHaveAttribute(
       'href',
       '/login'
@@ -61,9 +59,9 @@ describe('Home (Landing Page)', () => {
     const component = await Home();
     render(component);
 
-    expect(screen.getByText('Track Dishes')).toBeInTheDocument();
-    expect(screen.getByText('Remember Favorites')).toBeInTheDocument();
-    expect(screen.getByText('Build History')).toBeInTheDocument();
+    expect(screen.getByText('Log what you got')).toBeInTheDocument();
+    expect(screen.getByText('Find your usual')).toBeInTheDocument();
+    expect(screen.getByText('Keep your history')).toBeInTheDocument();
   });
 
   it('should have Get Started button linking to login', async () => {
