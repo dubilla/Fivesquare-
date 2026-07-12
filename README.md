@@ -1,10 +1,12 @@
-# Reordr
+# The Usual
 
-A personal food tracking app that helps you remember what you've ordered at different venues.
+_"I'll have the usual."_ A personal food-memory app: remember what you ordered at each place and whether you'd order it again.
+
+Brand: **The Usual**. "Fivesquare" remains the in-house project/repo codename.
 
 ## Features
 
-- Track dishes ordered at restaurants and venues
+- Check in at a place and record the dish you ordered
 - Add personal notes about your experience
 - View history of check-ins and venue visits
 - Search places with Google Places integration

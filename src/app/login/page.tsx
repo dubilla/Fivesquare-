@@ -81,7 +81,10 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full space-y-8 p-8 bg-white rounded-lg shadow-md">
         <div>
-          <h2 className="text-3xl font-bold text-center text-gray-900">
+          <p className="text-center text-xl font-bold text-gray-900">
+            The Usual
+          </p>
+          <h2 className="mt-2 text-2xl font-semibold text-center text-gray-700">
             {mode === 'signin' && 'Sign in to your account'}
             {mode === 'signup' && 'Create a new account'}
           </h2>
