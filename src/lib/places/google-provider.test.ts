@@ -138,6 +138,40 @@ describe('GooglePlacesProvider', () => {
     expect(body.locationRestriction.circle.radius).toBe(1000);
   });
 
+  it('should omit includedTypes when neither keyword nor type is given', async () => {
+    (global.fetch as Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ places: [] }),
+    });
+
+    const provider = new GooglePlacesProvider('test-api-key');
+    await provider.searchNearby({ location: { lat: 40.73, lng: -73.99 } });
+
+    const [url] = (global.fetch as Mock).mock.calls[0];
+    expect(url).toBe('https://places.googleapis.com/v1/places:searchNearby');
+    // No type filter → return all nearby place types (legacy behavior).
+    expect(lastRequestBody().includedTypes).toBeUndefined();
+  });
+
+  it('should fall back to statusText on a non-JSON error body', async () => {
+    (global.fetch as Mock).mockResolvedValueOnce({
+      ok: false,
+      statusText: 'Bad Gateway',
+      json: async () => {
+        throw new Error('not json');
+      },
+    });
+
+    const provider = new GooglePlacesProvider('test-api-key');
+
+    await expect(
+      provider.searchNearby({
+        location: { lat: 40.73, lng: -73.99 },
+        keyword: 'pizza',
+      })
+    ).rejects.toThrow('Bad Gateway');
+  });
+
   it('should handle a zero-result response (no places field)', async () => {
     (global.fetch as Mock).mockResolvedValueOnce({
       ok: true,

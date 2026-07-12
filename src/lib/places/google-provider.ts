@@ -57,11 +57,18 @@ export class GooglePlacesProvider implements PlacesProvider {
         ? await this.request('places:searchText', {
             textQuery: keyword,
             ...(type ? { includedType: type } : {}),
+            // A soft bias toward the search radius, not a hard restriction:
+            // Text Search only restricts by rectangle, and hard-filtering would
+            // surprise users with empty results when their spot sits just
+            // outside the radius. The hybrid proximity score sinks far matches.
             locationBias: { circle: { center, radius } },
-            maxResultCount: 20,
+            pageSize: 20,
           })
         : await this.request('places:searchNearby', {
-            includedTypes: [type ?? 'restaurant'],
+            // includedTypes is optional; omit it (rather than defaulting to
+            // restaurants) so a bare search returns all nearby place types,
+            // matching the legacy endpoint's no-type behavior.
+            ...(type ? { includedTypes: [type] } : {}),
             rankPreference: 'DISTANCE',
             locationRestriction: { circle: { center, radius } },
             maxResultCount: 20,
@@ -112,41 +119,38 @@ export class GooglePlacesProvider implements PlacesProvider {
     origin: Location,
     radius: number
   ): Place[] {
-    type PlaceWithScore = Place & { hybridScore: number };
-
-    const scored: PlaceWithScore[] = results.map((result, index) => {
-      const placeLocation = {
+    const scored = results.map((result, index) => {
+      const place: Place = {
+        place_id: result.id,
+        name: result.displayName?.text ?? '',
         lat: result.location.latitude,
         lng: result.location.longitude,
+        formattedAddress: result.formattedAddress,
+        primaryType: result.primaryType,
+        types: result.types,
+        distance: calculateDistance(origin, {
+          lat: result.location.latitude,
+          lng: result.location.longitude,
+        }),
       };
-      const distance = calculateDistance(origin, placeLocation);
 
-      // Preserve the existing ranking: 70% proximity, 30% provider relevance
-      // (the provider returns results in relevance order, so index is rank).
+      // Preserve the existing 70% proximity / 30% relevance ranking. The
+      // result index is the provider's own rank — relevance order for Text
+      // Search, distance order for Nearby Search — used as the relevance term.
       const hybridScore = calculateHybridScore(
-        distance,
+        place.distance!,
         index,
         results.length,
         radius
       );
 
-      return {
-        place_id: result.id,
-        name: result.displayName?.text ?? '',
-        lat: placeLocation.lat,
-        lng: placeLocation.lng,
-        formattedAddress: result.formattedAddress,
-        primaryType: result.primaryType,
-        types: result.types,
-        distance,
-        hybridScore,
-      };
+      return { place, hybridScore };
     });
 
-    // Sort by hybrid score (highest first), take top 10, drop the internal score.
+    // Sort by hybrid score (highest first), take top 10.
     return scored
       .sort((a, b) => b.hybridScore - a.hybridScore)
       .slice(0, 10)
-      .map(({ hybridScore: _hybridScore, ...place }) => place);
+      .map(({ place }) => place);
   }
 }
