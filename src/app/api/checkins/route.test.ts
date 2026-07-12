@@ -185,6 +185,7 @@ describe('POST /api/checkins', () => {
         lng: -73.99,
         dishText: 'Margherita Pizza',
         noteText: 'Amazing crust',
+        verdict: 'yes',
         visitDatetime: '2025-01-15T18:00:00Z',
       }),
     });
@@ -195,6 +196,56 @@ describe('POST /api/checkins', () => {
     expect(response.status).toBe(201);
     expect(data.id).toBe('checkin-123');
     expect(data.dishText).toBe('Margherita Pizza');
+  });
+
+  it('should require a verdict', async () => {
+    (auth as Mock).mockResolvedValue({
+      user: { id: 'user-123', email: 'test@example.com' },
+      expires: '',
+    });
+
+    const request = new NextRequest('http://localhost/api/checkins', {
+      method: 'POST',
+      body: JSON.stringify({
+        placeId: 'place-abc',
+        placeName: 'Test Restaurant',
+        lat: 40.73,
+        lng: -73.99,
+        dishText: 'Pizza',
+        // verdict omitted
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toContain('verdict');
+  });
+
+  it('should reject an invalid verdict value', async () => {
+    (auth as Mock).mockResolvedValue({
+      user: { id: 'user-123', email: 'test@example.com' },
+      expires: '',
+    });
+
+    const request = new NextRequest('http://localhost/api/checkins', {
+      method: 'POST',
+      body: JSON.stringify({
+        placeId: 'place-abc',
+        placeName: 'Test Restaurant',
+        lat: 40.73,
+        lng: -73.99,
+        dishText: 'Pizza',
+        verdict: 'sometimes',
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toContain('verdict');
   });
 
   it('should require placeId', async () => {
@@ -328,6 +379,7 @@ describe('POST /api/checkins', () => {
         lat: 40.73,
         lng: -73.99,
         dishText: 'Pizza',
+        verdict: 'maybe',
         // noteText omitted
       }),
     });

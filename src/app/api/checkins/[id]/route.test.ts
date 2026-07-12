@@ -488,4 +488,225 @@ describe('PUT /api/checkins/[id]', () => {
       })
     );
   });
+
+  it('should let a legacy (null-verdict) check-in add a verdict', async () => {
+    (auth as Mock).mockResolvedValue({
+      user: { id: 'user-123', email: 'test@example.com' },
+      expires: '',
+    });
+
+    const legacyCheckIn = {
+      id: 'checkin-123',
+      userId: 'user-123',
+      placeId: 'place-abc',
+      placeName: 'Test Restaurant',
+      lat: 40.73,
+      lng: -73.99,
+      dishText: 'Pizza',
+      noteText: null,
+      verdict: null,
+      visitDatetime: new Date('2025-01-15'),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const mockSelect = {
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([legacyCheckIn]),
+        }),
+      }),
+    };
+    (db.select as Mock).mockReturnValue(mockSelect);
+
+    const mockUpdate = {
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi
+            .fn()
+            .mockResolvedValue([{ ...legacyCheckIn, verdict: 'yes' }]),
+        }),
+      }),
+    };
+    (db.update as Mock).mockReturnValue(mockUpdate);
+
+    const request = new NextRequest('http://localhost/api/checkins/123', {
+      method: 'PUT',
+      body: JSON.stringify({
+        placeId: 'place-abc',
+        placeName: 'Test Restaurant',
+        lat: 40.73,
+        lng: -73.99,
+        dishText: 'Pizza',
+        verdict: 'yes',
+      }),
+    });
+
+    const response = await PUT(request, {
+      params: Promise.resolve({ id: 'checkin-123' }),
+    });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.verdict).toBe('yes');
+    expect(mockUpdate.set).toHaveBeenCalledWith(
+      expect.objectContaining({ verdict: 'yes' })
+    );
+  });
+
+  it('should preserve the existing verdict when none is supplied', async () => {
+    (auth as Mock).mockResolvedValue({
+      user: { id: 'user-123', email: 'test@example.com' },
+      expires: '',
+    });
+
+    const existingCheckIn = {
+      id: 'checkin-123',
+      userId: 'user-123',
+      placeId: 'place-abc',
+      placeName: 'Test Restaurant',
+      lat: 40.73,
+      lng: -73.99,
+      dishText: 'Pizza',
+      noteText: null,
+      verdict: 'yes',
+      visitDatetime: new Date('2025-01-15'),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const mockSelect = {
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([existingCheckIn]),
+        }),
+      }),
+    };
+    (db.select as Mock).mockReturnValue(mockSelect);
+
+    const mockUpdate = {
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([existingCheckIn]),
+        }),
+      }),
+    };
+    (db.update as Mock).mockReturnValue(mockUpdate);
+
+    const request = new NextRequest('http://localhost/api/checkins/123', {
+      method: 'PUT',
+      body: JSON.stringify({
+        placeId: 'place-abc',
+        placeName: 'Test Restaurant',
+        lat: 40.73,
+        lng: -73.99,
+        dishText: 'Pizza',
+        // verdict omitted entirely
+      }),
+    });
+
+    await PUT(request, { params: Promise.resolve({ id: 'checkin-123' }) });
+
+    expect(mockUpdate.set).toHaveBeenCalledWith(
+      expect.objectContaining({ verdict: 'yes' })
+    );
+  });
+
+  it('should not clear an existing verdict when null is supplied', async () => {
+    (auth as Mock).mockResolvedValue({
+      user: { id: 'user-123', email: 'test@example.com' },
+      expires: '',
+    });
+
+    const existingCheckIn = {
+      id: 'checkin-123',
+      userId: 'user-123',
+      placeId: 'place-abc',
+      placeName: 'Test Restaurant',
+      lat: 40.73,
+      lng: -73.99,
+      dishText: 'Pizza',
+      noteText: null,
+      verdict: 'no',
+      visitDatetime: new Date('2025-01-15'),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const mockSelect = {
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([existingCheckIn]),
+        }),
+      }),
+    };
+    (db.select as Mock).mockReturnValue(mockSelect);
+
+    const mockUpdate = {
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([existingCheckIn]),
+        }),
+      }),
+    };
+    (db.update as Mock).mockReturnValue(mockUpdate);
+
+    const request = new NextRequest('http://localhost/api/checkins/123', {
+      method: 'PUT',
+      body: JSON.stringify({
+        placeId: 'place-abc',
+        placeName: 'Test Restaurant',
+        lat: 40.73,
+        lng: -73.99,
+        dishText: 'Pizza',
+        verdict: null,
+      }),
+    });
+
+    const response = await PUT(request, {
+      params: Promise.resolve({ id: 'checkin-123' }),
+    });
+
+    expect(response.status).toBe(200);
+    // null must not strip the existing verdict.
+    expect(mockUpdate.set).toHaveBeenCalledWith(
+      expect.objectContaining({ verdict: 'no' })
+    );
+  });
+
+  it('should reject an invalid verdict value', async () => {
+    (auth as Mock).mockResolvedValue({
+      user: { id: 'user-123', email: 'test@example.com' },
+      expires: '',
+    });
+
+    const mockSelect = {
+      from: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          limit: vi.fn().mockResolvedValue([{ id: 'checkin-123' }]),
+        }),
+      }),
+    };
+    (db.select as Mock).mockReturnValue(mockSelect);
+
+    const request = new NextRequest('http://localhost/api/checkins/123', {
+      method: 'PUT',
+      body: JSON.stringify({
+        placeId: 'place-abc',
+        placeName: 'Test Restaurant',
+        lat: 40.73,
+        lng: -73.99,
+        dishText: 'Pizza',
+        verdict: 'sometimes',
+      }),
+    });
+
+    const response = await PUT(request, {
+      params: Promise.resolve({ id: 'checkin-123' }),
+    });
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toContain('verdict');
+  });
 });

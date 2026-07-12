@@ -1,5 +1,6 @@
 import {
   pgTable,
+  pgEnum,
   text,
   timestamp,
   integer,
@@ -7,6 +8,12 @@ import {
   doublePrecision,
   varchar,
 } from 'drizzle-orm/pg-core';
+import { VERDICTS } from '@/lib/verdict';
+
+// "Would you order this again?" — the heart of the product (S2).
+// Nullable on the table: historic rows predate the verdict; the form
+// requires it going forward. Values come from the DB-free source of truth.
+export const verdictEnum = pgEnum('verdict', VERDICTS);
 
 export const users = pgTable('users', {
   id: text('id')
@@ -76,7 +83,15 @@ export const checkIns = pgTable('check_ins', {
   lng: doublePrecision('lng').notNull(),
   dishText: varchar('dish_text', { length: 100 }).notNull(),
   noteText: varchar('note_text', { length: 500 }),
-  visitDatetime: timestamp('visit_datetime', { mode: 'date' }).notNull(),
-  createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
-  updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
+  verdict: verdictEnum('verdict'),
+  visitDatetime: timestamp('visit_datetime', {
+    mode: 'date',
+    withTimezone: true,
+  }).notNull(),
+  createdAt: timestamp('created_at', { mode: 'date', withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true })
+    .defaultNow()
+    .notNull(),
 });

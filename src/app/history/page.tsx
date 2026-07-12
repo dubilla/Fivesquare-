@@ -1,6 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { VerdictControl } from '@/components/verdict-control';
+import { VerdictBadge } from '@/components/verdict-badge';
+import type { Verdict } from '@/lib/verdict';
 
 interface CheckIn {
   id: string;
@@ -10,6 +13,7 @@ interface CheckIn {
   lng: number;
   dishText: string;
   noteText: string | null;
+  verdict: Verdict | null;
   visitDatetime: string;
   createdAt: string;
   updatedAt: string;
@@ -22,6 +26,7 @@ export default function HistoryPage() {
   const [editingCheckIn, setEditingCheckIn] = useState<CheckIn | null>(null);
   const [editDishText, setEditDishText] = useState('');
   const [editNoteText, setEditNoteText] = useState('');
+  const [editVerdict, setEditVerdict] = useState<Verdict | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
 
@@ -87,12 +92,14 @@ export default function HistoryPage() {
     setEditingCheckIn(checkIn);
     setEditDishText(checkIn.dishText);
     setEditNoteText(checkIn.noteText || '');
+    setEditVerdict(checkIn.verdict);
   };
 
   const handleCancelEdit = () => {
     setEditingCheckIn(null);
     setEditDishText('');
     setEditNoteText('');
+    setEditVerdict(null);
   };
 
   const handleSaveEdit = async () => {
@@ -112,6 +119,7 @@ export default function HistoryPage() {
           lng: editingCheckIn.lng,
           dishText: editDishText.trim(),
           noteText: editNoteText.trim() || null,
+          verdict: editVerdict,
           visitDatetime: editingCheckIn.visitDatetime,
         }),
       });
@@ -205,9 +213,14 @@ export default function HistoryPage() {
               >
                 <div className="flex justify-between items-start mb-3">
                   <div>
-                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                      {checkIn.dishText}
-                    </h2>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                        {checkIn.dishText}
+                      </h2>
+                      {checkIn.verdict && (
+                        <VerdictBadge verdict={checkIn.verdict} />
+                      )}
+                    </div>
                     <p className="text-gray-600 dark:text-gray-400 mt-1">
                       {checkIn.placeName}
                     </p>
@@ -283,6 +296,17 @@ export default function HistoryPage() {
                   <div className="mt-1 text-sm text-gray-500 dark:text-gray-400 text-right">
                     {100 - editDishText.length} characters remaining
                   </div>
+                </div>
+
+                {/* Verdict */}
+                <div>
+                  <span className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Would you order this again?
+                  </span>
+                  <VerdictControl
+                    value={editVerdict}
+                    onChange={setEditVerdict}
+                  />
                 </div>
 
                 {/* Note Text */}

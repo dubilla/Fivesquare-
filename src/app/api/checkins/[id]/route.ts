@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/auth';
 import { db } from '@/lib/db/client';
 import { checkIns } from '@/lib/db/schema';
+import { VERDICTS, isVerdict } from '@/lib/verdict';
 import { eq, and } from 'drizzle-orm';
 
 export async function DELETE(
@@ -62,8 +63,16 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { placeId, placeName, lat, lng, dishText, noteText, visitDatetime } =
-      body;
+    const {
+      placeId,
+      placeName,
+      lat,
+      lng,
+      dishText,
+      noteText,
+      verdict,
+      visitDatetime,
+    } = body;
 
     // Check if check-in exists and belongs to user
     const existing = await db
@@ -137,6 +146,18 @@ export async function PUT(
       }
     }
 
+    // Verdict is optional on edit: legacy rows can add one, but you aren't
+    // forced to. A missing (undefined) or null verdict preserves the existing
+    // value — the product has no "clear my verdict" affordance, so we never let
+    // a null strip a verdict that's already there. Any other non-verdict value
+    // is a client error.
+    if (verdict !== undefined && verdict !== null && !isVerdict(verdict)) {
+      return NextResponse.json(
+        { error: `verdict must be one of: ${VERDICTS.join(', ')}` },
+        { status: 400 }
+      );
+    }
+
     const visitDate = visitDatetime ? new Date(visitDatetime) : new Date();
     if (isNaN(visitDate.getTime())) {
       return NextResponse.json(
@@ -155,6 +176,9 @@ export async function PUT(
         lng,
         dishText,
         noteText: noteText || null,
+        // Preserve the existing verdict unless a valid new one is supplied
+        // (null/undefined never clears it).
+        verdict: isVerdict(verdict) ? verdict : existing[0].verdict,
         visitDatetime: visitDate,
         updatedAt: new Date(),
       })

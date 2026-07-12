@@ -71,7 +71,7 @@ describe('CheckInPage', () => {
       expect(submitButton).toBeDisabled();
     });
 
-    it('should enable submit button when place and dish are provided', async () => {
+    it('should enable submit button when place, dish, and verdict are provided', async () => {
       const user = userEvent.setup();
       render(<CheckInPage />);
 
@@ -83,9 +83,34 @@ describe('CheckInPage', () => {
       const dishInput = screen.getByPlaceholderText(/margherita pizza/i);
       await user.type(dishInput, 'Test Dish');
 
+      // Choose a verdict
+      await user.click(screen.getByRole('radio', { name: /order again/i }));
+
       const submitButton = screen.getByRole('button', {
         name: /save check-in/i,
       });
+
+      expect(submitButton).not.toBeDisabled();
+    });
+
+    it('should keep submit disabled until a verdict is chosen', async () => {
+      const user = userEvent.setup();
+      render(<CheckInPage />);
+
+      await user.click(screen.getByText('Select Test Place'));
+      await user.type(
+        screen.getByPlaceholderText(/margherita pizza/i),
+        'Test Dish'
+      );
+
+      const submitButton = screen.getByRole('button', {
+        name: /save check-in/i,
+      });
+
+      // Place + dish present, but no verdict yet
+      expect(submitButton).toBeDisabled();
+
+      await user.click(screen.getByRole('radio', { name: /order again/i }));
 
       expect(submitButton).not.toBeDisabled();
     });
@@ -199,6 +224,9 @@ describe('CheckInPage', () => {
       const noteInput = screen.getByPlaceholderText(/what did you think/i);
       await user.type(noteInput, 'Great food!');
 
+      // Choose a verdict
+      await user.click(screen.getByRole('radio', { name: /order again/i }));
+
       // Submit
       const submitButton = screen.getByRole('button', {
         name: /save check-in/i,
@@ -229,6 +257,7 @@ describe('CheckInPage', () => {
         lng: -73.99,
         dishText: 'Test Dish',
         noteText: 'Great food!',
+        verdict: 'yes',
       });
 
       // Should redirect to history
@@ -254,6 +283,9 @@ describe('CheckInPage', () => {
       // Enter dish text
       const dishInput = screen.getByPlaceholderText(/margherita pizza/i);
       await user.type(dishInput, 'Test Dish');
+
+      // Choose a verdict
+      await user.click(screen.getByRole('radio', { name: /order again/i }));
 
       // Submit
       const submitButton = screen.getByRole('button', {
@@ -283,6 +315,9 @@ describe('CheckInPage', () => {
       // Enter dish text
       const dishInput = screen.getByPlaceholderText(/margherita pizza/i);
       await user.type(dishInput, 'Test Dish');
+
+      // Choose a verdict
+      await user.click(screen.getByRole('radio', { name: /order again/i }));
 
       // Submit
       const submitButton = screen.getByRole('button', {
@@ -319,6 +354,7 @@ describe('CheckInPage', () => {
         screen.getByPlaceholderText(/what did you think/i),
         'Great!'
       );
+      await user.click(screen.getByRole('radio', { name: /order again/i }));
 
       // Submit
       await user.click(screen.getByRole('button', { name: /save check-in/i }));

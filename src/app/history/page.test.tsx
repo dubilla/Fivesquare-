@@ -64,6 +64,7 @@ describe('HistoryPage', () => {
         lng: -73.99,
         dishText: 'Margherita Pizza',
         noteText: 'Amazing crust!',
+        verdict: 'yes',
         visitDatetime: '2025-01-15T18:00:00Z',
         createdAt: '2025-01-15T18:00:00Z',
         updatedAt: '2025-01-15T18:00:00Z',
@@ -76,6 +77,7 @@ describe('HistoryPage', () => {
         lng: -73.98,
         dishText: 'Caesar Salad',
         noteText: null,
+        verdict: null, // legacy row, no verdict
         visitDatetime: '2025-01-14T12:00:00Z',
         createdAt: '2025-01-14T12:00:00Z',
         updatedAt: '2025-01-14T12:00:00Z',
@@ -97,6 +99,10 @@ describe('HistoryPage', () => {
       expect(screen.getByText('Caesar Salad')).toBeInTheDocument();
       expect(screen.getByText('Another Place')).toBeInTheDocument();
       expect(screen.queryByText('No notes')).not.toBeInTheDocument();
+
+      // The rated check-in shows a verdict badge; the legacy null-verdict one
+      // shows nothing. "Order again" is unique to the yes verdict.
+      expect(screen.getByText(/order again/i)).toBeInTheDocument();
     });
   });
 
