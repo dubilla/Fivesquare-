@@ -17,9 +17,10 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    // Check if check-in exists and belongs to user
+    // Check if check-in exists and belongs to user. Explicit column so this
+    // query doesn't reference the deprecated denormalized columns (dropped S5b).
     const existing = await db
-      .select()
+      .select({ id: checkIns.id })
       .from(checkIns)
       .where(and(eq(checkIns.id, id), eq(checkIns.userId, session.user.id)))
       .limit(1);
@@ -63,20 +64,15 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
-    const {
-      placeId,
-      placeName,
-      lat,
-      lng,
-      dishText,
-      noteText,
-      verdict,
-      visitDatetime,
-    } = body;
+    // Editing changes only dish/note/verdict; place isn't editable in the
+    // product, so place fields are neither read nor written here anymore.
+    const { dishText, noteText, verdict, visitDatetime } = body;
 
-    // Check if check-in exists and belongs to user
+    // Check if check-in exists and belongs to user. Explicit columns (no
+    // denormalized place columns — dropped at S5b); verdict feeds the
+    // preserve-on-edit logic below.
     const existing = await db
-      .select()
+      .select({ verdict: checkIns.verdict })
       .from(checkIns)
       .where(and(eq(checkIns.id, id), eq(checkIns.userId, session.user.id)))
       .limit(1);
@@ -89,34 +85,6 @@ export async function PUT(
     }
 
     // Validate required fields
-    if (!placeId || typeof placeId !== 'string') {
-      return NextResponse.json(
-        { error: 'placeId is required and must be a string' },
-        { status: 400 }
-      );
-    }
-
-    if (!placeName || typeof placeName !== 'string') {
-      return NextResponse.json(
-        { error: 'placeName is required and must be a string' },
-        { status: 400 }
-      );
-    }
-
-    if (typeof lat !== 'number' || lat < -90 || lat > 90) {
-      return NextResponse.json(
-        { error: 'lat is required and must be a number between -90 and 90' },
-        { status: 400 }
-      );
-    }
-
-    if (typeof lng !== 'number' || lng < -180 || lng > 180) {
-      return NextResponse.json(
-        { error: 'lng is required and must be a number between -180 and 180' },
-        { status: 400 }
-      );
-    }
-
     if (!dishText || typeof dishText !== 'string') {
       return NextResponse.json(
         { error: 'dishText is required and must be a string' },
@@ -166,14 +134,12 @@ export async function PUT(
       );
     }
 
-    // Update the check-in
+    // Update the check-in. Explicit returning (no denormalized place columns);
+    // the client merges this over the row it already has, so place data it
+    // already holds is preserved.
     const [updated] = await db
       .update(checkIns)
       .set({
-        placeId,
-        placeName,
-        lat,
-        lng,
         dishText,
         noteText: noteText || null,
         // Preserve the existing verdict unless a valid new one is supplied
@@ -183,7 +149,16 @@ export async function PUT(
         updatedAt: new Date(),
       })
       .where(and(eq(checkIns.id, id), eq(checkIns.userId, session.user.id)))
-      .returning();
+      .returning({
+        id: checkIns.id,
+        placeUuid: checkIns.placeUuid,
+        dishText: checkIns.dishText,
+        noteText: checkIns.noteText,
+        verdict: checkIns.verdict,
+        visitDatetime: checkIns.visitDatetime,
+        createdAt: checkIns.createdAt,
+        updatedAt: checkIns.updatedAt,
+      });
 
     return NextResponse.json(updated, { status: 200 });
   } catch (error) {

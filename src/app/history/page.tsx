@@ -8,10 +8,12 @@ import type { Verdict } from '@/lib/verdict';
 interface CheckIn {
   id: string;
   placeUuid: string | null;
-  placeId: string;
-  placeName: string;
-  lat: number;
-  lng: number;
+  // Place fields come from the places join now and are null only for a row
+  // that somehow never got linked (shouldn't happen post-S5 migration).
+  placeId: string | null;
+  placeName: string | null;
+  lat: number | null;
+  lng: number | null;
   dishText: string;
   noteText: string | null;
   verdict: Verdict | null;
@@ -114,10 +116,6 @@ export default function HistoryPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          placeId: editingCheckIn.placeId,
-          placeName: editingCheckIn.placeName,
-          lat: editingCheckIn.lat,
-          lng: editingCheckIn.lng,
           dishText: editDishText.trim(),
           noteText: editNoteText.trim() || null,
           verdict: editVerdict,
@@ -132,9 +130,13 @@ export default function HistoryPage() {
 
       const updated = await response.json();
 
-      // Update in state
+      // Merge the update over the existing row: the PUT response carries only
+      // the check-in's own fields (dish/note/verdict/…), so keep the place data
+      // we already have — editing never changes the place.
       setCheckIns(
-        checkIns.map(c => (c.id === editingCheckIn.id ? updated : c))
+        checkIns.map(c =>
+          c.id === editingCheckIn.id ? { ...c, ...updated } : c
+        )
       );
 
       handleCancelEdit();
@@ -231,7 +233,7 @@ export default function HistoryPage() {
                       </a>
                     ) : (
                       <p className="text-gray-600 dark:text-gray-400 mt-1">
-                        {checkIn.placeName}
+                        {checkIn.placeName ?? 'Unknown place'}
                       </p>
                     )}
                   </div>
@@ -249,14 +251,20 @@ export default function HistoryPage() {
                 )}
 
                 <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex justify-between items-center">
-                  <a
-                    href={`https://www.google.com/maps/search/?api=1&query=${checkIn.lat},${checkIn.lng}&query_place_id=${checkIn.placeId}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
-                  >
-                    View on Google Maps →
-                  </a>
+                  {checkIn.lat != null &&
+                  checkIn.lng != null &&
+                  checkIn.placeId ? (
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${checkIn.lat},${checkIn.lng}&query_place_id=${checkIn.placeId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      View on Google Maps →
+                    </a>
+                  ) : (
+                    <span />
+                  )}
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleEditClick(checkIn)}

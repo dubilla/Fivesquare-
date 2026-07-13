@@ -21,6 +21,17 @@ describe('GET /api/checkins', () => {
     vi.clearAllMocks();
   });
 
+  // GET joins places: db.select().from().leftJoin().where().orderBy()
+  function mockGetChain(orderBy: Mock) {
+    return {
+      from: vi.fn().mockReturnValue({
+        leftJoin: vi.fn().mockReturnValue({
+          where: vi.fn().mockReturnValue({ orderBy }),
+        }),
+      }),
+    };
+  }
+
   it('should reject unauthenticated requests', async () => {
     (auth as Mock).mockResolvedValue(null);
 
@@ -66,14 +77,9 @@ describe('GET /api/checkins', () => {
       },
     ];
 
-    const mockSelect = {
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          orderBy: vi.fn().mockResolvedValue(mockCheckIns),
-        }),
-      }),
-    };
-    (db.select as Mock).mockReturnValue(mockSelect);
+    (db.select as Mock).mockReturnValue(
+      mockGetChain(vi.fn().mockResolvedValue(mockCheckIns))
+    );
 
     const response = await GET();
     const data = await response.json();
@@ -90,14 +96,9 @@ describe('GET /api/checkins', () => {
       expires: '',
     });
 
-    const mockSelect = {
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          orderBy: vi.fn().mockResolvedValue([]),
-        }),
-      }),
-    };
-    (db.select as Mock).mockReturnValue(mockSelect);
+    (db.select as Mock).mockReturnValue(
+      mockGetChain(vi.fn().mockResolvedValue([]))
+    );
 
     const response = await GET();
     const data = await response.json();
@@ -112,14 +113,9 @@ describe('GET /api/checkins', () => {
       expires: '',
     });
 
-    const mockSelect = {
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          orderBy: vi.fn().mockRejectedValue(new Error('DB connection failed')),
-        }),
-      }),
-    };
-    (db.select as Mock).mockReturnValue(mockSelect);
+    (db.select as Mock).mockReturnValue(
+      mockGetChain(vi.fn().mockRejectedValue(new Error('DB connection failed')))
+    );
 
     const response = await GET();
     const data = await response.json();

@@ -83,18 +83,25 @@ describe('PlacePage', () => {
     expect(notFound).toHaveBeenCalled();
   });
 
-  it('renders the place and the user’s visits when authorized', async () => {
+  it('renders the place, a grouped dish summary, and the visit log', async () => {
     (auth as Mock).mockResolvedValue({ user: { id: 'user-1' }, expires: '' });
     (db.select as Mock)
       .mockReturnValueOnce(mockPlaceQuery([place]))
       .mockReturnValueOnce(
         mockVisitsQuery([
           {
-            id: 'checkin-1',
-            dishText: 'Morning bun',
-            noteText: 'Worth the line.',
+            id: 'checkin-2',
+            dishText: 'Morning Bun', // latest spelling
+            noteText: null,
             verdict: 'yes',
             visitDatetime: new Date('2025-06-01T12:00:00Z'),
+          },
+          {
+            id: 'checkin-1',
+            dishText: 'morning bun ', // groups with the above
+            noteText: 'Worth the line.',
+            verdict: 'maybe',
+            visitDatetime: new Date('2025-01-01T12:00:00Z'),
           },
         ])
       );
@@ -103,8 +110,15 @@ describe('PlacePage', () => {
 
     expect(screen.getByText('Tartine Bakery')).toBeInTheDocument();
     expect(screen.getByText('600 Guerrero St')).toBeInTheDocument();
-    expect(screen.getByText('Morning bun')).toBeInTheDocument();
+
+    // Dish summary groups the two spellings into one row: "2 visits".
+    expect(screen.getByText('What you order here')).toBeInTheDocument();
+    expect(screen.getByText('2 visits')).toBeInTheDocument();
+
+    // Visit log shows both individual visits below.
+    expect(screen.getByText('All visits · 2')).toBeInTheDocument();
     expect(screen.getByText('Worth the line.')).toBeInTheDocument();
+
     expect(notFound).not.toHaveBeenCalled();
   });
 });
