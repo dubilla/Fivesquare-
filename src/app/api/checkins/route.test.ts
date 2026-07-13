@@ -169,12 +169,17 @@ describe('POST /api/checkins', () => {
       updatedAt: new Date(),
     };
 
-    const mockInsert = {
-      values: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue([mockCheckIn]),
+    const placeValues = vi.fn().mockReturnValue({
+      onConflictDoUpdate: vi.fn().mockReturnValue({
+        returning: vi.fn().mockResolvedValue([{ id: 'place-uuid-1' }]),
       }),
-    };
-    (db.insert as Mock).mockReturnValue(mockInsert);
+    });
+    const checkInValues = vi.fn().mockReturnValue({
+      returning: vi.fn().mockResolvedValue([mockCheckIn]),
+    });
+    (db.insert as Mock)
+      .mockReturnValueOnce({ values: placeValues }) // place upsert
+      .mockReturnValueOnce({ values: checkInValues }); // check-in
 
     const request = new NextRequest('http://localhost/api/checkins', {
       method: 'POST',
@@ -183,6 +188,8 @@ describe('POST /api/checkins', () => {
         placeName: 'Test Restaurant',
         lat: 40.73,
         lng: -73.99,
+        formattedAddress: '123 Test St',
+        primaryType: 'pizza_restaurant',
         dishText: 'Margherita Pizza',
         noteText: 'Amazing crust',
         verdict: 'yes',
@@ -196,6 +203,19 @@ describe('POST /api/checkins', () => {
     expect(response.status).toBe(201);
     expect(data.id).toBe('checkin-123');
     expect(data.dishText).toBe('Margherita Pizza');
+
+    // The place is upserted by its Google ID, and the check-in references it.
+    expect(placeValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        googlePlaceId: 'place-abc',
+        name: 'Test Restaurant',
+        formattedAddress: '123 Test St',
+        primaryType: 'pizza_restaurant',
+      })
+    );
+    expect(checkInValues).toHaveBeenCalledWith(
+      expect.objectContaining({ placeUuid: 'place-uuid-1' })
+    );
   });
 
   it('should require a verdict', async () => {
@@ -269,6 +289,31 @@ describe('POST /api/checkins', () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toContain('placeId');
+  });
+
+  it('should enforce placeName length limit (200 chars) on the shared place', async () => {
+    (auth as Mock).mockResolvedValue({
+      user: { id: 'user-123', email: 'test@example.com' },
+      expires: '',
+    });
+
+    const request = new NextRequest('http://localhost/api/checkins', {
+      method: 'POST',
+      body: JSON.stringify({
+        placeId: 'place-abc',
+        placeName: 'a'.repeat(201),
+        lat: 40.73,
+        lng: -73.99,
+        dishText: 'Pizza',
+        verdict: 'yes',
+      }),
+    });
+
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toContain('placeName');
   });
 
   it('should enforce dishText length limit (100 chars)', async () => {
@@ -364,12 +409,19 @@ describe('POST /api/checkins', () => {
       updatedAt: new Date(),
     };
 
-    const mockInsert = {
-      values: vi.fn().mockReturnValue({
-        returning: vi.fn().mockResolvedValue([mockCheckIn]),
-      }),
-    };
-    (db.insert as Mock).mockReturnValue(mockInsert);
+    (db.insert as Mock)
+      .mockReturnValueOnce({
+        values: vi.fn().mockReturnValue({
+          onConflictDoUpdate: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([{ id: 'place-uuid-1' }]),
+          }),
+        }),
+      })
+      .mockReturnValueOnce({
+        values: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([mockCheckIn]),
+        }),
+      });
 
     const request = new NextRequest('http://localhost/api/checkins', {
       method: 'POST',
