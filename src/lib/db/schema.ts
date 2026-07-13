@@ -100,21 +100,11 @@ export const checkIns = pgTable('check_ins', {
   userId: text('user_id')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
-  // FK to the normalized place — the source of truth for place data as of S5.
-  // Application code reads place name/coords via this join and no longer touches
-  // the denormalized columns below. Still nullable only because rows written by
-  // old code during the S4 deploy window predate it; the S5 migration re-links
-  // those, so in practice every row is linked.
+  // FK to the normalized place — the source of truth for place data. All place
+  // name/coords reads go through this join. The denormalized place_id/place_name/
+  // lat/lng columns were dropped at S5b (migration 0005); S5 code had already
+  // stopped reading and writing them, so the drop was safe to run mid-deploy.
   placeUuid: text('place_uuid').references(() => places.id),
-  // DEPRECATED denormalized place columns (S4 → removed at S5b). As of S5 no
-  // code reads or writes these — reads come from the places join, writes stopped
-  // — so they're nullable and inert, kept one release as a safety net. The S5b
-  // migration DROPs them; because S5 code already ignores them, that drop is
-  // safe to run while S5 is still serving (nothing SELECTs or INSERTs them).
-  placeId: text('place_id'),
-  placeName: text('place_name'),
-  lat: doublePrecision('lat'),
-  lng: doublePrecision('lng'),
   dishText: varchar('dish_text', { length: 100 }).notNull(),
   noteText: varchar('note_text', { length: 500 }),
   verdict: verdictEnum('verdict'),
