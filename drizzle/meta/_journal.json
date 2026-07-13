@@ -36,6 +36,13 @@
       "when": 1783905182792,
       "tag": "0004_lonely_supernaut",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1783907141166,
+      "tag": "0005_woozy_paibok",
+      "breakpoints": true
     }
   ]
 }
