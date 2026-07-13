@@ -48,6 +48,8 @@ export default function CheckInPage() {
           placeName: selectedPlace.name,
           lat: selectedPlace.lat,
           lng: selectedPlace.lng,
+          formattedAddress: selectedPlace.formattedAddress ?? null,
+          primaryType: selectedPlace.primaryType ?? null,
           dishText: dishText.trim(),
           noteText: noteText.trim() || null,
           verdict,

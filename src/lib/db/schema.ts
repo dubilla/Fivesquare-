@@ -70,6 +70,29 @@ export const verificationTokens = pgTable(
   })
 );
 
+// Normalized place (S4). Internal UUID PK — never the Google ID (provider
+// independence, Google place-ID churn, future manually-created places). The
+// Google ID is a unique lookup key. Address/type are nullable: rows backfilled
+// from legacy check-ins never captured them, and Google details are
+// contractually cacheable only ~30 days, so treat them as refreshable.
+export const places = pgTable('places', {
+  id: text('id')
+    .primaryKey()
+    .$defaultFn(() => crypto.randomUUID()),
+  googlePlaceId: text('google_place_id').notNull().unique(),
+  name: text('name').notNull(),
+  formattedAddress: text('formatted_address'),
+  primaryType: text('primary_type'),
+  lat: doublePrecision('lat').notNull(),
+  lng: doublePrecision('lng').notNull(),
+  createdAt: timestamp('created_at', { mode: 'date', withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true })
+    .defaultNow()
+    .notNull(),
+});
+
 export const checkIns = pgTable('check_ins', {
   id: text('id')
     .primaryKey()
@@ -77,6 +100,18 @@ export const checkIns = pgTable('check_ins', {
   userId: text('user_id')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
+  // FK to the normalized place (S4). Nullable for one release: the migration is
+  // expand-only (backfilled from the denormalized columns below), and the
+  // previously-deployed version keeps writing check-ins without it during the
+  // migrate-on-deploy window. New writes always set it. S5 drops the
+  // denormalized place_id/place_name/lat/lng once this is the source of truth.
+  //
+  // S5 OBLIGATION: check-ins written by the old code during the S4 deploy
+  // window land with place_uuid = NULL and are never re-linked (0003 runs once).
+  // Before S5 drops the denormalized columns, its migration MUST re-run the
+  // 0003 backfill block (insert missing places + UPDATE ... WHERE place_uuid IS
+  // NULL) or those rows lose their place identity permanently.
+  placeUuid: text('place_uuid').references(() => places.id),
   placeId: text('place_id').notNull(),
   placeName: text('place_name').notNull(),
   lat: doublePrecision('lat').notNull(),

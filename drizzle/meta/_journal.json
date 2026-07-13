@@ -22,6 +22,13 @@
       "when": 1783891514851,
       "tag": "0002_normal_phantom_reporter",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1783902643974,
+      "tag": "0003_familiar_sunfire",
+      "breakpoints": true
     }
   ]
 }

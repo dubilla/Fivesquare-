@@ -7,6 +7,7 @@ import type { Verdict } from '@/lib/verdict';
 
 interface CheckIn {
   id: string;
+  placeUuid: string | null;
   placeId: string;
   placeName: string;
   lat: number;
@@ -221,9 +222,18 @@ export default function HistoryPage() {
                         <VerdictBadge verdict={checkIn.verdict} />
                       )}
                     </div>
-                    <p className="text-gray-600 dark:text-gray-400 mt-1">
-                      {checkIn.placeName}
-                    </p>
+                    {checkIn.placeUuid ? (
+                      <a
+                        href={`/places/${checkIn.placeUuid}`}
+                        className="text-gray-600 dark:text-gray-400 mt-1 inline-block hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
+                      >
+                        {checkIn.placeName}
+                      </a>
+                    ) : (
+                      <p className="text-gray-600 dark:text-gray-400 mt-1">
+                        {checkIn.placeName}
+                      </p>
+                    )}
                   </div>
                   <div className="text-right">
                     <p className="text-sm text-gray-500 dark:text-gray-400">
