@@ -16,3 +16,7 @@ dist/
 
 # Public assets
 public/
+
+# Doctrine doc — hand-maintained (synced from global agent doctrine); keep
+# prettier (and thus the lint-staged pre-commit hook + CI format:check) off it.
+AGENTS.md
