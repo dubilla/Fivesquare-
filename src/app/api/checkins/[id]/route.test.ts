@@ -281,7 +281,7 @@ describe('PUT /api/checkins/[id]', () => {
     expect(data.noteText).toBe('Great!');
   });
 
-  it('should require placeId', async () => {
+  it('does not require place fields (place is not editable)', async () => {
     (auth as Mock).mockResolvedValue({
       user: { id: 'user-123', email: 'test@example.com' },
       expires: '',
@@ -290,20 +290,27 @@ describe('PUT /api/checkins/[id]', () => {
     const mockSelect = {
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{ id: 'checkin-123' }]),
+          limit: vi.fn().mockResolvedValue([{ verdict: 'yes' }]),
         }),
       }),
     };
     (db.select as Mock).mockReturnValue(mockSelect);
 
+    const mockUpdate = {
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi
+            .fn()
+            .mockResolvedValue([{ id: 'checkin-123', dishText: 'Pizza' }]),
+        }),
+      }),
+    };
+    (db.update as Mock).mockReturnValue(mockUpdate);
+
+    // Body carries no placeId/placeName/lat/lng — PUT must accept it.
     const request = new NextRequest('http://localhost/api/checkins/123', {
       method: 'PUT',
-      body: JSON.stringify({
-        placeName: 'Test Restaurant',
-        lat: 40.73,
-        lng: -73.99,
-        dishText: 'Pizza',
-      }),
+      body: JSON.stringify({ dishText: 'Pizza', verdict: 'yes' }),
     });
 
     const response = await PUT(request, {
@@ -311,8 +318,12 @@ describe('PUT /api/checkins/[id]', () => {
     });
     const data = await response.json();
 
-    expect(response.status).toBe(400);
-    expect(data.error).toContain('placeId');
+    expect(response.status).toBe(200);
+    expect(data.dishText).toBe('Pizza');
+    // The update never writes place columns.
+    expect(mockUpdate.set).toHaveBeenCalledWith(
+      expect.not.objectContaining({ placeId: expect.anything() })
+    );
   });
 
   it('should enforce dishText length limit (100 chars)', async () => {
@@ -384,41 +395,6 @@ describe('PUT /api/checkins/[id]', () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toContain('500 characters');
-  });
-
-  it('should validate coordinates', async () => {
-    (auth as Mock).mockResolvedValue({
-      user: { id: 'user-123', email: 'test@example.com' },
-      expires: '',
-    });
-
-    const mockSelect = {
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockReturnValue({
-          limit: vi.fn().mockResolvedValue([{ id: 'checkin-123' }]),
-        }),
-      }),
-    };
-    (db.select as Mock).mockReturnValue(mockSelect);
-
-    const request = new NextRequest('http://localhost/api/checkins/123', {
-      method: 'PUT',
-      body: JSON.stringify({
-        placeId: 'place-abc',
-        placeName: 'Test Restaurant',
-        lat: 91, // Invalid
-        lng: -73.99,
-        dishText: 'Pizza',
-      }),
-    });
-
-    const response = await PUT(request, {
-      params: Promise.resolve({ id: 'checkin-123' }),
-    });
-    const data = await response.json();
-
-    expect(response.status).toBe(400);
-    expect(data.error).toContain('lat');
   });
 
   it('should update updatedAt timestamp', async () => {

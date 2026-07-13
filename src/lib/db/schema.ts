@@ -100,22 +100,21 @@ export const checkIns = pgTable('check_ins', {
   userId: text('user_id')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
-  // FK to the normalized place (S4). Nullable for one release: the migration is
-  // expand-only (backfilled from the denormalized columns below), and the
-  // previously-deployed version keeps writing check-ins without it during the
-  // migrate-on-deploy window. New writes always set it. S5 drops the
-  // denormalized place_id/place_name/lat/lng once this is the source of truth.
-  //
-  // S5 OBLIGATION: check-ins written by the old code during the S4 deploy
-  // window land with place_uuid = NULL and are never re-linked (0003 runs once).
-  // Before S5 drops the denormalized columns, its migration MUST re-run the
-  // 0003 backfill block (insert missing places + UPDATE ... WHERE place_uuid IS
-  // NULL) or those rows lose their place identity permanently.
+  // FK to the normalized place — the source of truth for place data as of S5.
+  // Application code reads place name/coords via this join and no longer touches
+  // the denormalized columns below. Still nullable only because rows written by
+  // old code during the S4 deploy window predate it; the S5 migration re-links
+  // those, so in practice every row is linked.
   placeUuid: text('place_uuid').references(() => places.id),
-  placeId: text('place_id').notNull(),
-  placeName: text('place_name').notNull(),
-  lat: doublePrecision('lat').notNull(),
-  lng: doublePrecision('lng').notNull(),
+  // DEPRECATED denormalized place columns (S4 → removed at S5b). As of S5 no
+  // code reads or writes these — reads come from the places join, writes stopped
+  // — so they're nullable and inert, kept one release as a safety net. The S5b
+  // migration DROPs them; because S5 code already ignores them, that drop is
+  // safe to run while S5 is still serving (nothing SELECTs or INSERTs them).
+  placeId: text('place_id'),
+  placeName: text('place_name'),
+  lat: doublePrecision('lat'),
+  lng: doublePrecision('lng'),
   dishText: varchar('dish_text', { length: 100 }).notNull(),
   noteText: varchar('note_text', { length: 500 }),
   verdict: verdictEnum('verdict'),

@@ -12,9 +12,28 @@ export async function GET() {
   }
 
   try {
+    // Place data (name/coords/Google ID) comes from the places join now, not the
+    // deprecated denormalized check_ins columns (removed at S5b). Explicit column
+    // list so this query never references those columns — that's what makes the
+    // S5b DROP safe to run while this version is still serving. leftJoin so a
+    // (should-not-exist post-migration) unlinked row still returns.
     const userCheckIns = await db
-      .select()
+      .select({
+        id: checkIns.id,
+        placeUuid: checkIns.placeUuid,
+        placeName: places.name,
+        placeId: places.googlePlaceId,
+        lat: places.lat,
+        lng: places.lng,
+        dishText: checkIns.dishText,
+        noteText: checkIns.noteText,
+        verdict: checkIns.verdict,
+        visitDatetime: checkIns.visitDatetime,
+        createdAt: checkIns.createdAt,
+        updatedAt: checkIns.updatedAt,
+      })
       .from(checkIns)
+      .leftJoin(places, eq(checkIns.placeUuid, places.id))
       .where(eq(checkIns.userId, session.user.id))
       .orderBy(desc(checkIns.visitDatetime));
 
@@ -209,23 +228,41 @@ export async function POST(request: NextRequest) {
       .onConflictDoUpdate({ target: places.googlePlaceId, set: placeUpdate })
       .returning();
 
+    // The check-in points at the place via place_uuid only; the denormalized
+    // place columns are no longer written (removed at S5b). Explicit returning so
+    // this INSERT never names those columns — keeping the S5b DROP safe.
     const [newCheckIn] = await db
       .insert(checkIns)
       .values({
         userId: session.user.id,
         placeUuid: place.id,
-        placeId,
-        placeName,
-        lat,
-        lng,
         dishText,
         noteText: noteText || null,
         verdict,
         visitDatetime: visitDate,
       })
-      .returning();
+      .returning({
+        id: checkIns.id,
+        placeUuid: checkIns.placeUuid,
+        dishText: checkIns.dishText,
+        noteText: checkIns.noteText,
+        verdict: checkIns.verdict,
+        visitDatetime: checkIns.visitDatetime,
+        createdAt: checkIns.createdAt,
+        updatedAt: checkIns.updatedAt,
+      });
 
-    return NextResponse.json(newCheckIn, { status: 201 });
+    // Shape the response like GET's rows: place data from the place we upserted.
+    return NextResponse.json(
+      {
+        ...newCheckIn,
+        placeName: place.name,
+        placeId: place.googlePlaceId,
+        lat: place.lat,
+        lng: place.lng,
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error('Error creating check-in:', error);
 

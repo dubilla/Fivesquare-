@@ -4,11 +4,13 @@ import { auth } from '@/auth';
 import { db } from '@/lib/db/client';
 import { checkIns, places } from '@/lib/db/schema';
 import { VerdictBadge } from '@/components/verdict-badge';
+import { rollupDishes } from '@/lib/dishes/rollup';
 
-// A place's page (S4): every visit *you* logged here, newest first. The first
-// real payoff of normalizing places — your history at a single place.
-// Auth-gated and scoped to the signed-in user; a place you've never visited
-// 404s rather than leaking that it exists.
+// A place's page (S4/S5): leads with the dish summary — each dish you've
+// ordered here, grouped, with visit count and latest verdict ("should I get the
+// club sandwich again?") — then the full visit log below. Auth-gated and scoped
+// to the signed-in user; a place you've never visited 404s rather than leaking
+// that it exists.
 
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat('en-US', {
@@ -40,8 +42,15 @@ export default async function PlacePage({
     notFound();
   }
 
+  // Explicit columns — no denormalized place columns (dropped at S5b).
   const visits = await db
-    .select()
+    .select({
+      id: checkIns.id,
+      dishText: checkIns.dishText,
+      noteText: checkIns.noteText,
+      verdict: checkIns.verdict,
+      visitDatetime: checkIns.visitDatetime,
+    })
     .from(checkIns)
     .where(
       and(eq(checkIns.placeUuid, id), eq(checkIns.userId, session.user.id))
@@ -52,6 +61,9 @@ export default async function PlacePage({
   if (visits.length === 0) {
     notFound();
   }
+
+  // Read-time dish rollup (S5): group visits by dish for the summary.
+  const dishes = rollupDishes(visits);
 
   const mapsUrl = `https://www.google.com/maps/search/?api=1&query=${place.lat},${place.lng}&query_place_id=${place.googlePlaceId}`;
 
@@ -84,8 +96,37 @@ export default async function PlacePage({
           </a>
         </div>
 
+        {/* Dish summary — the "should I get the club sandwich?" screen. */}
         <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-4">
-          {visits.length} {visits.length === 1 ? 'visit' : 'visits'}
+          What you order here
+        </h2>
+        <div className="space-y-3 mb-10">
+          {dishes.map(dish => (
+            <div
+              key={dish.key}
+              className="bg-white dark:bg-gray-800 rounded-lg shadow p-5 flex items-center justify-between gap-4"
+            >
+              <div className="min-w-0">
+                <div className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+                  {dish.displayName}
+                </div>
+                <div className="text-sm text-gray-500 dark:text-gray-400">
+                  {dish.count} {dish.count === 1 ? 'visit' : 'visits'}
+                </div>
+              </div>
+              {dish.latestVerdict ? (
+                <VerdictBadge verdict={dish.latestVerdict} />
+              ) : (
+                <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
+                  No verdict yet
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-4">
+          All visits · {visits.length}
         </h2>
 
         <div className="space-y-4">

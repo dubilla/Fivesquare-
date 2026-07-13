@@ -79,15 +79,17 @@ async function main() {
   for (let i = 0; i < CHECK_INS.length; i++) {
     const [placeIdx, dish, verdict, note, daysAgo] = CHECK_INS[i];
     const place = PLACES[placeIdx];
-    const [placeId, placeName, , , lat, lng] = place;
+    const placeId = place[0]; // seed place id doubles as its google_place_id
     const visitDatetime = new Date(now - daysAgo * DAY_MS).toISOString();
 
+    // Reference the place via place_uuid only — the denormalized place columns
+    // are deprecated (dropped at S5b), so don't write them.
     await sql`
       INSERT INTO check_ins
-        (id, user_id, place_uuid, place_id, place_name, lat, lng, dish_text, note_text, verdict, visit_datetime)
+        (id, user_id, place_uuid, dish_text, note_text, verdict, visit_datetime)
       VALUES
-        (${`seed-checkin-${i + 1}`}, ${USER_ID}, ${placeId}, ${placeId}, ${placeName},
-         ${lat}, ${lng}, ${dish}, ${note}, ${verdict}, ${visitDatetime})
+        (${`seed-checkin-${i + 1}`}, ${USER_ID}, ${placeId},
+         ${dish}, ${note}, ${verdict}, ${visitDatetime})
       ON CONFLICT (id) DO NOTHING
     `;
   }

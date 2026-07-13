@@ -29,6 +29,13 @@
       "when": 1783902643974,
       "tag": "0003_familiar_sunfire",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1783905182792,
+      "tag": "0004_lonely_supernaut",
+      "breakpoints": true
     }
   ]
 }
