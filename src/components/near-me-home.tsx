@@ -1,9 +1,24 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { VerdictBadge } from '@/components/verdict-badge';
 import { formatDistance } from '@/lib/places/distance';
 import type { Verdict } from '@/lib/verdict';
+
+// MapLibre touches window/WebGL, so the map is client-only — never server-render
+// it. Loaded lazily so its weight lands only when the user opens the map view.
+const PlacesMap = dynamic(
+  () => import('@/components/places-map').then(m => m.PlacesMap),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-[70vh] w-full rounded-lg bg-gray-100 dark:bg-gray-800 animate-pulse" />
+    ),
+  }
+);
+
+type View = 'list' | 'map';
 
 interface NearbyPlace {
   id: string;
@@ -27,6 +42,11 @@ type State =
 // unavailable or denied (never a dead screen).
 export function NearMeHome() {
   const [state, setState] = useState<State>({ status: 'locating' });
+  const [view, setView] = useState<View>('list');
+  // Remembered so the map can open centered on the user when we have a fix.
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(
+    null
+  );
 
   const locate = useCallback(() => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
@@ -40,6 +60,7 @@ export function NearMeHome() {
         setState({ status: 'loading' });
         try {
           const { latitude, longitude } = position.coords;
+          setCoords({ lat: latitude, lng: longitude });
           const res = await fetch(
             `/api/places/near-me?lat=${latitude}&lng=${longitude}`
           );
@@ -85,26 +106,35 @@ export function NearMeHome() {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
             Near you
           </h1>
-          <a
-            href="/check-in"
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors whitespace-nowrap"
-          >
-            New Check-In
-          </a>
+          <div className="flex items-center gap-3">
+            <ViewToggle view={view} onChange={setView} />
+            <a
+              href="/check-in"
+              className="bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors whitespace-nowrap"
+            >
+              New Check-In
+            </a>
+          </div>
         </div>
 
-        {(state.status === 'locating' || state.status === 'loading') && (
-          <div className="text-center py-12">
-            <div className="animate-spin h-12 w-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
-            <p className="mt-4 text-gray-600 dark:text-gray-400">
-              {state.status === 'locating'
-                ? 'Finding your location…'
-                : 'Looking for your places nearby…'}
-            </p>
-          </div>
-        )}
+        {/* Map view stands alone: it frames all your places by viewport, so it
+            works even when the list's geolocation was denied or is still
+            resolving. */}
+        {view === 'map' && <PlacesMap center={coords ?? undefined} />}
 
-        {state.status === 'error' && (
+        {view === 'list' &&
+          (state.status === 'locating' || state.status === 'loading') && (
+            <div className="text-center py-12">
+              <div className="animate-spin h-12 w-12 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
+              <p className="mt-4 text-gray-600 dark:text-gray-400">
+                {state.status === 'locating'
+                  ? 'Finding your location…'
+                  : 'Looking for your places nearby…'}
+              </p>
+            </div>
+          )}
+
+        {view === 'list' && state.status === 'error' && (
           <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
             <p className="text-red-600 dark:text-red-400 mb-4">
               {state.message}
@@ -118,9 +148,12 @@ export function NearMeHome() {
           </div>
         )}
 
-        {state.status === 'fallback' && <LocationFallback onRetry={locate} />}
+        {view === 'list' && state.status === 'fallback' && (
+          <LocationFallback onRetry={locate} />
+        )}
 
-        {state.status === 'ready' &&
+        {view === 'list' &&
+          state.status === 'ready' &&
           (state.places.length === 0 ? (
             // Reached only after the widest radius came back empty — the user may
             // have places, just none within range (e.g. traveling). Offer both
@@ -184,6 +217,42 @@ export function NearMeHome() {
             </div>
           ))}
       </div>
+    </div>
+  );
+}
+
+// Segmented List / Map switch for the home screen. The two views share the same
+// places; the map just plots what the list ranks.
+function ViewToggle({
+  view,
+  onChange,
+}: {
+  view: View;
+  onChange: (view: View) => void;
+}) {
+  const base =
+    'px-3 py-1.5 text-sm font-medium rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500';
+  const active =
+    'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm';
+  const inactive =
+    'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white';
+  return (
+    <div
+      role="group"
+      aria-label="Choose list or map view"
+      className="inline-flex gap-1 p-1 bg-gray-200 dark:bg-gray-800 rounded-lg"
+    >
+      {(['list', 'map'] as const).map(v => (
+        <button
+          key={v}
+          type="button"
+          aria-pressed={view === v}
+          onClick={() => onChange(v)}
+          className={`${base} ${view === v ? active : inactive}`}
+        >
+          {v === 'list' ? 'List' : 'Map'}
+        </button>
+      ))}
     </div>
   );
 }

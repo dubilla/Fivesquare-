@@ -1,27 +1,47 @@
-// "Near me" spatial query (S6): the user's own places, nearest-first, each with
-// its top dish and verdict — the data behind the home screen. Factored as a lib
-// because S7 (map) reuses it with a bounding-box variant.
+// Places-with-summary spatial queries: the user's own places, each with its top
+// dish and verdict — the data behind the home screen. Two shapes share one
+// rollup: "near me" (nearest-first within a radius, the list view) and "in
+// bounds" (everything in a map viewport, the map view).
 //
-// Distance/containment run in Postgres via PostGIS: ST_DWithin (index-backed by
-// the GiST index on places.location) filters to a radius, ST_Distance orders.
-// The dish rollup stays in JS — it reuses the S5 read-time grouping so "top
-// dish" means exactly what it does on the place page.
+// Distance/containment run in Postgres via PostGIS against the GiST index on
+// places.location: ST_DWithin filters to a radius, ST_Distance orders, and the
+// geography `&&` operator does index-backed bounding-box overlap for the map.
+// The dish rollup stays in JS — it reuses the read-time grouping so "top dish"
+// means exactly what it does on the place page.
 import { and, eq, inArray, sql } from 'drizzle-orm';
 import { db } from '@/lib/db/client';
 import { checkIns, places } from '@/lib/db/schema';
 import { rollupDishes, type DishVisit } from '@/lib/dishes/rollup';
 import type { Verdict } from '@/lib/verdict';
 
-export interface NearbyPlace {
+/** A place summarized by its headline dish + verdict — shared by both queries. */
+interface PlaceSummary {
+  topDish: string | null;
+  topVerdict: Verdict | null;
+}
+
+export interface NearbyPlace extends PlaceSummary {
   id: string;
   name: string;
   formattedAddress: string | null;
   /** Great-circle distance from the user, in whole meters. */
   distanceMeters: number;
-  /** The user's usual here (most-ordered dish); null if somehow no visits. */
-  topDish: string | null;
-  /** That dish's latest verdict; null for legacy visits without one. */
-  topVerdict: Verdict | null;
+}
+
+export interface MapPlace extends PlaceSummary {
+  id: string;
+  name: string;
+  formattedAddress: string | null;
+  lat: number;
+  lng: number;
+}
+
+/** A map viewport, as returned by MapLibre's `getBounds()`. */
+export interface Bounds {
+  minLat: number;
+  minLng: number;
+  maxLat: number;
+  maxLng: number;
 }
 
 // Widen the search if the smaller radius is empty, so someone whose places are
@@ -102,9 +122,91 @@ export async function findPlacesNearUser({
 
   if (rows.length === 0) return [];
 
-  // Batch-fetch the user's visits for the returned places, then roll up per
-  // place in JS. One extra query total (not one per place).
-  const placeIds = rows.map(r => r.id);
+  const summaries = await summarizePlaceVisits(
+    userId,
+    rows.map(r => r.id)
+  );
+
+  return rows.map(row => ({
+    id: row.id,
+    name: row.name,
+    formattedAddress: row.formattedAddress,
+    // ST_Distance can arrive as a string over the wire; coerce before rounding.
+    distanceMeters: Math.round(Number(row.distanceMeters)),
+    ...(summaries.get(row.id) ?? { topDish: null, topVerdict: null }),
+  }));
+}
+
+/**
+ * The signed-in user's places for the map, each summarized with its top
+ * dish/verdict. With `bounds`, only places inside that viewport; with `null`,
+ * all of them (the map opens framed to everywhere you've been, then narrows to
+ * the viewport as you explore). Unordered — the map places pins, it doesn't
+ * rank. Empty array if there are no matching places.
+ */
+export async function findPlacesInBounds({
+  userId,
+  bounds,
+}: {
+  userId: string;
+  bounds: Bounds | null;
+}): Promise<MapPlace[]> {
+  // Only the user's own places — same EXISTS pattern as near-me: one row per
+  // place, and it lets the planner use the GiST index for the && bound.
+  const ownedByUser = sql`EXISTS (
+    SELECT 1 FROM ${checkIns}
+    WHERE ${checkIns.placeUuid} = ${places.id}
+      AND ${checkIns.userId} = ${userId}
+  )`;
+
+  // Geography `&&` bounding-box overlap, index-backed by the GiST index on
+  // places.location. ST_MakeEnvelope wants (minLng, minLat, maxLng, maxLat) and
+  // returns geometry(4326); cast to geography so both sides match and the
+  // geography operator/index apply. Omitted for the "all places" case — a
+  // whole-globe envelope is degenerate in geography (its edges are great-circle
+  // arcs, and ±180° lng coincide), so "everything" must be no predicate, not a
+  // world-sized box.
+  const inViewport = bounds
+    ? sql`${places.location} && ST_MakeEnvelope(${bounds.minLng}, ${bounds.minLat}, ${bounds.maxLng}, ${bounds.maxLat}, 4326)::geography`
+    : undefined;
+
+  const rows = await db
+    .select({
+      id: places.id,
+      name: places.name,
+      formattedAddress: places.formattedAddress,
+      lat: places.lat,
+      lng: places.lng,
+    })
+    .from(places)
+    .where(inViewport ? and(inViewport, ownedByUser) : ownedByUser);
+
+  if (rows.length === 0) return [];
+
+  const summaries = await summarizePlaceVisits(
+    userId,
+    rows.map(r => r.id)
+  );
+
+  return rows.map(row => ({
+    id: row.id,
+    name: row.name,
+    formattedAddress: row.formattedAddress,
+    lat: row.lat,
+    lng: row.lng,
+    ...(summaries.get(row.id) ?? { topDish: null, topVerdict: null }),
+  }));
+}
+
+/**
+ * Batch-fetch the user's visits for a set of places and roll each place up to
+ * its top dish/verdict. One query total (not one per place); returns a map
+ * keyed by place id. Shared by both spatial queries.
+ */
+async function summarizePlaceVisits(
+  userId: string,
+  placeIds: string[]
+): Promise<Map<string, PlaceSummary>> {
   const visits = await db
     .select({
       placeUuid: checkIns.placeUuid,
@@ -125,12 +227,9 @@ export async function findPlacesNearUser({
     else visitsByPlace.set(v.placeUuid, [v]);
   }
 
-  return rows.map(row => ({
-    id: row.id,
-    name: row.name,
-    formattedAddress: row.formattedAddress,
-    // ST_Distance can arrive as a string over the wire; coerce before rounding.
-    distanceMeters: Math.round(Number(row.distanceMeters)),
-    ...summarizeTopDish(visitsByPlace.get(row.id) ?? []),
-  }));
+  const summaries = new Map<string, PlaceSummary>();
+  for (const id of placeIds) {
+    summaries.set(id, summarizeTopDish(visitsByPlace.get(id) ?? []));
+  }
+  return summaries;
 }
