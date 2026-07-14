@@ -7,8 +7,22 @@ import {
   primaryKey,
   doublePrecision,
   varchar,
+  customType,
+  index,
 } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
 import { VERDICTS } from '@/lib/verdict';
+
+// PostGIS geography point (S6). Drizzle has no native geography type, so this is
+// a thin custom type: the DB stores/queries it as geography(Point,4326); the app
+// never reads it as a value (near-me queries reference it via raw `sql`
+// fragments — ST_DWithin/ST_Distance), so the driver representation is opaque
+// WKB we just pass through.
+const geographyPoint = customType<{ data: string; driverData: string }>({
+  dataType() {
+    return 'geography(Point, 4326)';
+  },
+});
 
 // "Would you order this again?" — the heart of the product (S2).
 // Nullable on the table: historic rows predate the verdict; the form
@@ -75,23 +89,36 @@ export const verificationTokens = pgTable(
 // Google ID is a unique lookup key. Address/type are nullable: rows backfilled
 // from legacy check-ins never captured them, and Google details are
 // contractually cacheable only ~30 days, so treat them as refreshable.
-export const places = pgTable('places', {
-  id: text('id')
-    .primaryKey()
-    .$defaultFn(() => crypto.randomUUID()),
-  googlePlaceId: text('google_place_id').notNull().unique(),
-  name: text('name').notNull(),
-  formattedAddress: text('formatted_address'),
-  primaryType: text('primary_type'),
-  lat: doublePrecision('lat').notNull(),
-  lng: doublePrecision('lng').notNull(),
-  createdAt: timestamp('created_at', { mode: 'date', withTimezone: true })
-    .defaultNow()
-    .notNull(),
-  updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true })
-    .defaultNow()
-    .notNull(),
-});
+export const places = pgTable(
+  'places',
+  {
+    id: text('id')
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    googlePlaceId: text('google_place_id').notNull().unique(),
+    name: text('name').notNull(),
+    formattedAddress: text('formatted_address'),
+    primaryType: text('primary_type'),
+    lat: doublePrecision('lat').notNull(),
+    lng: doublePrecision('lng').notNull(),
+    // Spatial mirror of lat/lng (S6). GENERATED STORED so the DB derives it from
+    // the scalars — lat/lng stay the source of truth and the point can never
+    // drift; no write site sets it. Note the longitude-first argument order.
+    // Backs the GiST index below for fast "near me" (ST_DWithin) queries.
+    location: geographyPoint('location').generatedAlwaysAs(
+      sql`ST_MakePoint("lng", "lat")::geography`
+    ),
+    createdAt: timestamp('created_at', { mode: 'date', withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    updatedAt: timestamp('updated_at', { mode: 'date', withTimezone: true })
+      .defaultNow()
+      .notNull(),
+  },
+  table => ({
+    locationIdx: index('places_location_idx').using('gist', table.location),
+  })
+);
 
 export const checkIns = pgTable('check_ins', {
   id: text('id')

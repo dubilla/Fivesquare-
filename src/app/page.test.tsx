@@ -21,20 +21,19 @@ describe('Home (Landing Page)', () => {
     vi.clearAllMocks();
   });
 
-  it('should redirect authenticated users to /history', async () => {
+  it('should show the near-me home for authenticated users (no redirect)', async () => {
     // @ts-expect-error - mocking NextAuth function
     vi.mocked(auth).mockResolvedValue({
       user: { id: 'user-123', email: 'test@example.com' },
       expires: '',
     } as Session);
 
-    try {
-      await Home();
-    } catch {
-      // Redirect throws, which is expected
-    }
+    const component = await Home();
+    render(component);
 
-    expect(mockRedirect).toHaveBeenCalledWith('/history');
+    // Signed-in users get the "near me" home (S6), not a redirect.
+    expect(mockRedirect).not.toHaveBeenCalled();
+    expect(screen.getByText('Near you')).toBeInTheDocument();
   });
 
   it('should show landing page for unauthenticated users', async () => {

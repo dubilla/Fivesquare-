@@ -18,7 +18,27 @@ export async function Navbar() {
           <div className="flex items-center gap-4">
             {session?.user ? (
               <>
-                <span className="text-sm text-gray-700">
+                <div className="flex items-center gap-4">
+                  <Link
+                    href="/"
+                    className="text-sm font-medium text-gray-700 hover:text-gray-900"
+                  >
+                    Home
+                  </Link>
+                  <Link
+                    href="/check-in"
+                    className="text-sm font-medium text-gray-700 hover:text-gray-900"
+                  >
+                    Check in
+                  </Link>
+                  <Link
+                    href="/history"
+                    className="text-sm font-medium text-gray-700 hover:text-gray-900"
+                  >
+                    History
+                  </Link>
+                </div>
+                <span className="hidden text-sm text-gray-700 sm:inline">
                   {session.user.email}
                 </span>
                 <SignOutButton />
