@@ -1,6 +1,13 @@
 import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { NearMeHome } from './near-me-home';
+
+// PlacesMap pulls in MapLibre (WebGL, no jsdom support), so stub it — these
+// tests exercise the toggle wiring, not the map itself.
+vi.mock('@/components/places-map', () => ({
+  PlacesMap: () => <div data-testid="places-map">map</div>,
+}));
 
 // NearMeHome owns the geolocation → fetch flow. These tests cover the graceful
 // paths (unavailable / denied / success) without a real browser or DB.
@@ -104,5 +111,31 @@ describe('NearMeHome', () => {
     expect(
       screen.getByRole('link', { name: 'View all your places' })
     ).toHaveAttribute('href', '/history');
+  });
+
+  it('switches to the map view — and back — via the toggle', async () => {
+    const user = userEvent.setup();
+    // Map view must work regardless of geolocation, so leave it unavailable.
+    render(<NearMeHome />);
+
+    // Defaults to the list: the location fallback shows, no map.
+    expect(
+      await screen.findByText('Turn on location to see places near you')
+    ).toBeInTheDocument();
+    expect(screen.queryByTestId('places-map')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Map' }));
+
+    // Map appears; the list's location fallback is gone.
+    expect(await screen.findByTestId('places-map')).toBeInTheDocument();
+    expect(
+      screen.queryByText('Turn on location to see places near you')
+    ).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'List' }));
+    expect(screen.queryByTestId('places-map')).not.toBeInTheDocument();
+    expect(
+      screen.getByText('Turn on location to see places near you')
+    ).toBeInTheDocument();
   });
 });
