@@ -43,6 +43,13 @@
       "when": 1783907141166,
       "tag": "0005_woozy_paibok",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783909685188,
+      "tag": "0006_common_siren",
+      "breakpoints": true
     }
   ]
 }

@@ -1,12 +1,13 @@
 import { auth } from '@/auth';
-import { redirect } from 'next/navigation';
+import { NearMeHome } from '@/components/near-me-home';
 
 export default async function Home() {
   const session = await auth();
 
-  // Redirect authenticated users to their history
+  // Signed-in users land on their "near me" home (S6) — the app's front door,
+  // their places sorted by distance — instead of the bare history redirect.
   if (session?.user) {
-    redirect('/history');
+    return <NearMeHome />;
   }
 
   // Landing page for signed-out users
