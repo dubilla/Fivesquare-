@@ -3,12 +3,26 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import HistoryPage from './page';
 
+// The history page reads/writes the URL (S8 filters). Mock next/navigation:
+// searchParams is seeded per-test via `mockSearchParams`, and router.replace is
+// a spy so we can assert filter state is reflected in the URL.
+const mockReplace = vi.fn();
+// Stable router object, like Next's real useRouter — a fresh object each call
+// would make the page's URL-sync effect (which depends on router) loop.
+const mockRouter = { replace: mockReplace };
+let mockSearchParams = new URLSearchParams();
+vi.mock('next/navigation', () => ({
+  useRouter: () => mockRouter,
+  useSearchParams: () => mockSearchParams,
+}));
+
 // Mock fetch
 global.fetch = vi.fn();
 
 describe('HistoryPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockSearchParams = new URLSearchParams();
   });
 
   it('should show loading state initially', () => {
@@ -461,6 +475,81 @@ describe('HistoryPage', () => {
       expect(screen.getByText('Updated Pizza')).toBeInTheDocument();
       expect(screen.getByText('Even better!')).toBeInTheDocument();
       expect(screen.queryByText('Edit Check-In')).not.toBeInTheDocument();
+    });
+  });
+
+  // --- S8 filters ---
+
+  it('seeds filter state from the URL and sends it to the API', async () => {
+    mockSearchParams = new URLSearchParams('q=pad+thai&verdict=yes');
+
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ checkIns: [] }),
+    } as Response);
+
+    render(<HistoryPage />);
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith(
+        '/api/checkins?q=pad+thai&verdict=yes'
+      );
+    });
+
+    // The search box reflects the URL, and the Yes chip reads as pressed.
+    expect(screen.getByLabelText('Search check-ins')).toHaveValue('pad thai');
+    expect(
+      screen.getByRole('button', { name: 'Yes', pressed: true })
+    ).toBeInTheDocument();
+  });
+
+  it('toggling a verdict chip refetches and reflects the filter in the URL', async () => {
+    const user = userEvent.setup();
+
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ checkIns: [] }),
+    } as Response);
+
+    render(<HistoryPage />);
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith('/api/checkins');
+    });
+
+    await user.click(screen.getByRole('button', { name: 'No' }));
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenCalledWith('/api/checkins?verdict=no');
+    });
+    expect(mockReplace).toHaveBeenCalledWith('/history?verdict=no', {
+      scroll: false,
+    });
+  });
+
+  it('shows a filtered empty state with a clear action when nothing matches', async () => {
+    const user = userEvent.setup();
+    mockSearchParams = new URLSearchParams('verdict=no');
+
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ checkIns: [] }),
+    } as Response);
+
+    render(<HistoryPage />);
+
+    await waitFor(() => {
+      expect(
+        screen.getByText('No check-ins match your filters.')
+      ).toBeInTheDocument();
+    });
+    // Distinct from the first-run empty state.
+    expect(screen.queryByText('No check-ins yet!')).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Clear filters' }));
+
+    await waitFor(() => {
+      expect(fetch).toHaveBeenLastCalledWith('/api/checkins');
     });
   });
 });

@@ -3,15 +3,51 @@ import { auth } from '@/auth';
 import { db } from '@/lib/db/client';
 import { checkIns, places } from '@/lib/db/schema';
 import { VERDICTS, isVerdict } from '@/lib/verdict';
-import { eq, desc } from 'drizzle-orm';
+import { escapeLike } from '@/lib/db/like';
+import { eq, desc, and, or, ilike, type SQL } from 'drizzle-orm';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await auth();
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   try {
+    // S8 filters, all optional and composed onto the user scope with AND.
+    // Invalid/absent params are ignored rather than 400'd so a hand-edited or
+    // stale URL degrades to "no filter" instead of an error page.
+    const { searchParams } = request.nextUrl;
+    const conditions: SQL[] = [eq(checkIns.userId, session.user.id)];
+
+    // Cap length before building the LIKE pattern — the POST side bounds every
+    // string it stores, so don't let GET interpolate an unbounded term into two
+    // ILIKE patterns. 200 comfortably exceeds a dish (100) or place name (200).
+    const q = searchParams.get('q')?.trim().slice(0, 200);
+    if (q) {
+      // Case-insensitive substring match over dish and place name — the
+      // "where was that great pad thai?" job. ILIKE is sufficient at this scale
+      // (backlog: no full-text search / embeddings).
+      const pattern = `%${escapeLike(q)}%`;
+      conditions.push(
+        or(ilike(checkIns.dishText, pattern), ilike(places.name, pattern))!
+      );
+    }
+
+    const verdict = searchParams.get('verdict');
+    if (isVerdict(verdict)) {
+      conditions.push(eq(checkIns.verdict, verdict));
+    }
+
+    // Internal place UUID (the id place pages use). API-only in S8: the history
+    // page deliberately doesn't wire this (place-scoped recall is the place
+    // page's job), but the param is honored for programmatic/future callers.
+    // place_uuid is a text column, so a malformed value is a plain no-match
+    // (empty result), not a cast error — no validation needed to stay safe.
+    const placeId = searchParams.get('placeId');
+    if (placeId) {
+      conditions.push(eq(checkIns.placeUuid, placeId));
+    }
+
     // Place data (name/coords/Google ID) comes from the places join now, not the
     // deprecated denormalized check_ins columns (removed at S5b). Explicit column
     // list so this query never references those columns — that's what makes the
@@ -34,7 +70,7 @@ export async function GET() {
       })
       .from(checkIns)
       .leftJoin(places, eq(checkIns.placeUuid, places.id))
-      .where(eq(checkIns.userId, session.user.id))
+      .where(and(...conditions))
       .orderBy(desc(checkIns.visitDatetime));
 
     return NextResponse.json({ checkIns: userCheckIns }, { status: 200 });

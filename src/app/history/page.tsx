@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { VerdictControl } from '@/components/verdict-control';
 import { VerdictBadge } from '@/components/verdict-badge';
+import { VERDICTS, verdictStyles, isVerdict } from '@/lib/verdict';
 import type { Verdict } from '@/lib/verdict';
 
 interface CheckIn {
@@ -22,9 +24,30 @@ interface CheckIn {
   updatedAt: string;
 }
 
-export default function HistoryPage() {
+function HistoryView() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
+  // Filter state is seeded from the URL so a shared/bookmarked link or the back
+  // button restores exactly what you were looking at. History's job is
+  // recall-by-dish, so the only filters here are search (q) and verdict;
+  // place-scoped recall lives on the place page. The API also accepts a placeId
+  // param, but this page deliberately doesn't wire it — nothing here reads or
+  // writes it, so there's no invisible place filter to get stuck in.
+  const initialVerdict = searchParams.get('verdict');
+  const [search, setSearch] = useState(() => searchParams.get('q') ?? '');
+  const [verdict, setVerdict] = useState<Verdict | null>(
+    isVerdict(initialVerdict) ? initialVerdict : null
+  );
+  // Debounced mirror of `search` — what actually drives fetching + the URL, so
+  // typing doesn't fire a request (or a history-replace) on every keystroke.
+  const [debouncedSearch, setDebouncedSearch] = useState(search);
+
   const [checkIns, setCheckIns] = useState<CheckIn[]>([]);
   const [loading, setLoading] = useState(true);
+  // Distinct from `loading` (first paint): true while a filter-change refetch is
+  // in flight, so the list can dim instead of showing stale rows as if current.
+  const [isFetching, setIsFetching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [editingCheckIn, setEditingCheckIn] = useState<CheckIn | null>(null);
   const [editDishText, setEditDishText] = useState('');
@@ -33,10 +56,34 @@ export default function HistoryPage() {
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
 
+  const hasFilters = debouncedSearch.trim() !== '' || verdict !== null;
+
+  // Debounce the search box (300ms) into debouncedSearch.
   useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
+
+  // Monotonic request token: a slow response for an earlier filter state must
+  // not overwrite a newer one (out-of-order fetches). Only the latest wins.
+  const requestToken = useRef(0);
+
+  useEffect(() => {
+    const q = debouncedSearch.trim();
+
+    // Reflect filter state in the URL (shareable / back-button-safe). replace,
+    // not push, so typing doesn't flood history.
+    const params = new URLSearchParams();
+    if (q) params.set('q', q);
+    if (verdict) params.set('verdict', verdict);
+    const qs = params.toString();
+    router.replace(qs ? `/history?${qs}` : '/history', { scroll: false });
+
+    const token = ++requestToken.current;
+    setIsFetching(true);
     async function fetchCheckIns() {
       try {
-        const response = await fetch('/api/checkins');
+        const response = await fetch(`/api/checkins${qs ? `?${qs}` : ''}`);
 
         if (!response.ok) {
           const data = await response.json();
@@ -44,18 +91,24 @@ export default function HistoryPage() {
         }
 
         const data = await response.json();
+        if (token !== requestToken.current) return; // stale response
         setCheckIns(data.checkIns);
+        setError(null);
       } catch (err) {
+        if (token !== requestToken.current) return;
         setError(
           err instanceof Error ? err.message : 'Failed to load check-ins'
         );
       } finally {
-        setLoading(false);
+        if (token === requestToken.current) {
+          setLoading(false);
+          setIsFetching(false);
+        }
       }
     }
 
     fetchCheckIns();
-  }, []);
+  }, [debouncedSearch, verdict, router]);
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
@@ -147,6 +200,13 @@ export default function HistoryPage() {
     }
   };
 
+  const clearFilters = useCallback(() => {
+    setSearch('');
+    // Skip the 300ms search debounce so Clear refetches immediately.
+    setDebouncedSearch('');
+    setVerdict(null);
+  }, []);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8 px-4">
@@ -195,20 +255,91 @@ export default function HistoryPage() {
           </a>
         </div>
 
-        {checkIns.length === 0 ? (
-          <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
-            <p className="text-gray-600 dark:text-gray-400 mb-4">
-              No check-ins yet!
-            </p>
-            <a
-              href="/check-in"
-              className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
-            >
-              Create your first check-in
-            </a>
+        {/* Filter bar (S8). History's job is recall-by-dish — "where was that
+            great pad thai?" — so it filters by what you ate (search) and
+            whether you'd reorder (verdict chips). Place-scoped recall is the
+            place page's job, so there's deliberately no place control here. */}
+        <div className="mb-6 space-y-3">
+          <input
+            type="search"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search your dishes and places…"
+            aria-label="Search check-ins"
+            className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent dark:bg-gray-800 dark:text-white"
+          />
+          <div
+            role="group"
+            aria-label="Filter by reorder verdict"
+            className="flex items-center gap-2 flex-wrap"
+          >
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Reorder?
+            </span>
+            {VERDICTS.map(v => {
+              const active = verdict === v;
+              return (
+                <button
+                  key={v}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => setVerdict(active ? null : v)}
+                  className={`min-h-[44px] px-4 py-2 rounded-full border text-sm font-medium transition-colors ${
+                    active
+                      ? verdictStyles[v].selected
+                      : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  {verdictStyles[v].label}
+                </button>
+              );
+            })}
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="min-h-[44px] px-3 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400"
+              >
+                Clear
+              </button>
+            )}
           </div>
+        </div>
+
+        {checkIns.length === 0 ? (
+          hasFilters ? (
+            <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
+                No check-ins match your filters.
+              </p>
+              <button
+                type="button"
+                onClick={clearFilters}
+                className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+              >
+                Clear filters
+              </button>
+            </div>
+          ) : (
+            <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg shadow">
+              <p className="text-gray-600 dark:text-gray-400 mb-4">
+                No check-ins yet!
+              </p>
+              <a
+                href="/check-in"
+                className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors"
+              >
+                Create your first check-in
+              </a>
+            </div>
+          )
         ) : (
-          <div className="space-y-4">
+          <div
+            aria-busy={isFetching}
+            className={`space-y-4 transition-opacity ${
+              isFetching ? 'opacity-50' : 'opacity-100'
+            }`}
+          >
             {checkIns.map(checkIn => (
               <div
                 key={checkIn.id}
@@ -371,5 +502,15 @@ export default function HistoryPage() {
         )}
       </div>
     </div>
+  );
+}
+
+// useSearchParams requires a Suspense boundary during prerender (Next app
+// router). The wrapper keeps the page a client component while satisfying that.
+export default function HistoryPage() {
+  return (
+    <Suspense>
+      <HistoryView />
+    </Suspense>
   );
 }
