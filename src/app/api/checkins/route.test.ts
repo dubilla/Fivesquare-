@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import { GET, POST } from './route';
+import { escapeLike } from '@/lib/db/like';
 import { NextRequest } from 'next/server';
+
+// GET now reads filters from the request URL. Build a NextRequest for the
+// /api/checkins endpoint with the given query string.
+function getRequest(query = ''): NextRequest {
+  return new NextRequest(`http://localhost/api/checkins${query}`);
+}
 
 vi.mock('@/auth', () => ({
   auth: vi.fn(),
@@ -21,13 +28,13 @@ describe('GET /api/checkins', () => {
     vi.clearAllMocks();
   });
 
-  // GET joins places: db.select().from().leftJoin().where().orderBy()
-  function mockGetChain(orderBy: Mock) {
+  // GET joins places: db.select().from().leftJoin().where().orderBy().
+  // `where` is exposed so tests can assert a filter condition was composed.
+  function mockGetChain(orderBy: Mock, where: Mock = vi.fn()) {
+    where.mockReturnValue({ orderBy });
     return {
       from: vi.fn().mockReturnValue({
-        leftJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({ orderBy }),
-        }),
+        leftJoin: vi.fn().mockReturnValue({ where }),
       }),
     };
   }
@@ -35,7 +42,7 @@ describe('GET /api/checkins', () => {
   it('should reject unauthenticated requests', async () => {
     (auth as Mock).mockResolvedValue(null);
 
-    const response = await GET();
+    const response = await GET(getRequest());
     const data = await response.json();
 
     expect(response.status).toBe(401);
@@ -81,7 +88,7 @@ describe('GET /api/checkins', () => {
       mockGetChain(vi.fn().mockResolvedValue(mockCheckIns))
     );
 
-    const response = await GET();
+    const response = await GET(getRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -100,7 +107,7 @@ describe('GET /api/checkins', () => {
       mockGetChain(vi.fn().mockResolvedValue([]))
     );
 
-    const response = await GET();
+    const response = await GET(getRequest());
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -117,11 +124,60 @@ describe('GET /api/checkins', () => {
       mockGetChain(vi.fn().mockRejectedValue(new Error('DB connection failed')))
     );
 
-    const response = await GET();
+    const response = await GET(getRequest());
     const data = await response.json();
 
     expect(response.status).toBe(500);
     expect(data.error).toBe('DB connection failed');
+  });
+
+  // S8 filters. The DB is mocked, so these assert the route parses filter
+  // params and composes a WHERE without error — the SQL correctness of ILIKE /
+  // eq is Postgres's job, exercised in the app, not here.
+  it('applies q / verdict / placeId filters without error', async () => {
+    (auth as Mock).mockResolvedValue({
+      user: { id: 'user-123', email: 'test@example.com' },
+      expires: '',
+    });
+
+    const where = vi.fn();
+    (db.select as Mock).mockReturnValue(
+      mockGetChain(vi.fn().mockResolvedValue([]), where)
+    );
+
+    const response = await GET(
+      getRequest('?q=pad+thai&verdict=yes&placeId=place-uuid-1')
+    );
+
+    expect(response.status).toBe(200);
+    // A composed WHERE (user scope AND the three filters) was passed through.
+    expect(where).toHaveBeenCalledTimes(1);
+    expect(where.mock.calls[0][0]).toBeDefined();
+  });
+
+  it('ignores an invalid verdict rather than erroring', async () => {
+    (auth as Mock).mockResolvedValue({
+      user: { id: 'user-123', email: 'test@example.com' },
+      expires: '',
+    });
+
+    (db.select as Mock).mockReturnValue(
+      mockGetChain(vi.fn().mockResolvedValue([]))
+    );
+
+    const response = await GET(getRequest('?verdict=delicious'));
+
+    expect(response.status).toBe(200);
+  });
+});
+
+describe('escapeLike', () => {
+  it('escapes LIKE wildcards so user text matches literally', () => {
+    expect(escapeLike('50%')).toBe('50\\%');
+    expect(escapeLike('a_b')).toBe('a\\_b');
+    // Backslash is escaped first so added escapes are not double-escaped.
+    expect(escapeLike('a\\b')).toBe('a\\\\b');
+    expect(escapeLike('pad thai')).toBe('pad thai');
   });
 });
 
