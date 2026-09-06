@@ -42,8 +42,8 @@ export default async function Home() {
                 Log what you got
               </h3>
               <p className="text-gray-600 dark:text-gray-400 text-sm">
-                Check in at a place and record the dish you ordered, with a note
-                to jog your memory.
+                Check in at a place, snap a photo of the dish, and add a note to
+                jog your memory.
               </p>
             </div>
 

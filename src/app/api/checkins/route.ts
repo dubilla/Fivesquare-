@@ -4,7 +4,15 @@ import { db } from '@/lib/db/client';
 import { checkIns, places } from '@/lib/db/schema';
 import { VERDICTS, isVerdict } from '@/lib/verdict';
 import { escapeLike } from '@/lib/db/like';
+import { photoPublicUrl } from '@/lib/storage/photos';
 import { eq, desc, and, or, ilike, type SQL } from 'drizzle-orm';
+
+function withPhotoUrl<T extends { photoKey: string | null }>(row: T) {
+  return {
+    ...row,
+    photoUrl: photoPublicUrl(row.photoKey),
+  };
+}
 
 export async function GET(request: NextRequest) {
   const session = await auth();
@@ -64,6 +72,7 @@ export async function GET(request: NextRequest) {
         dishText: checkIns.dishText,
         noteText: checkIns.noteText,
         verdict: checkIns.verdict,
+        photoKey: checkIns.photoKey,
         visitDatetime: checkIns.visitDatetime,
         createdAt: checkIns.createdAt,
         updatedAt: checkIns.updatedAt,
@@ -73,7 +82,10 @@ export async function GET(request: NextRequest) {
       .where(and(...conditions))
       .orderBy(desc(checkIns.visitDatetime));
 
-    return NextResponse.json({ checkIns: userCheckIns }, { status: 200 });
+    return NextResponse.json(
+      { checkIns: userCheckIns.map(withPhotoUrl) },
+      { status: 200 }
+    );
   } catch (error) {
     console.error('Error fetching check-ins:', error);
 
@@ -106,6 +118,7 @@ export async function POST(request: NextRequest) {
       dishText,
       noteText,
       verdict,
+      photoKey,
       visitDatetime,
     } = body;
 
@@ -217,6 +230,30 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Optional photo key from the presign → PUT flow. Must be scoped to this
+    // user so a client can't attach someone else's object (or an arbitrary path).
+    let normalizedPhotoKey: string | null = null;
+    if (photoKey !== null && photoKey !== undefined) {
+      if (typeof photoKey !== 'string') {
+        return NextResponse.json(
+          { error: 'photoKey must be a string' },
+          { status: 400 }
+        );
+      }
+      const expectedPrefix = `checkins/${session.user.id}/`;
+      if (
+        !photoKey.startsWith(expectedPrefix) ||
+        photoKey.includes('..') ||
+        photoKey.length > 200
+      ) {
+        return NextResponse.json(
+          { error: 'photoKey is invalid' },
+          { status: 400 }
+        );
+      }
+      normalizedPhotoKey = photoKey;
+    }
+
     const visitDate = visitDatetime ? new Date(visitDatetime) : new Date();
     if (isNaN(visitDate.getTime())) {
       return NextResponse.json(
@@ -275,6 +312,7 @@ export async function POST(request: NextRequest) {
         dishText,
         noteText: noteText || null,
         verdict,
+        photoKey: normalizedPhotoKey,
         visitDatetime: visitDate,
       })
       .returning({
@@ -283,6 +321,7 @@ export async function POST(request: NextRequest) {
         dishText: checkIns.dishText,
         noteText: checkIns.noteText,
         verdict: checkIns.verdict,
+        photoKey: checkIns.photoKey,
         visitDatetime: checkIns.visitDatetime,
         createdAt: checkIns.createdAt,
         updatedAt: checkIns.updatedAt,
@@ -291,7 +330,7 @@ export async function POST(request: NextRequest) {
     // Shape the response like GET's rows: place data from the place we upserted.
     return NextResponse.json(
       {
-        ...newCheckIn,
+        ...withPhotoUrl(newCheckIn),
         placeName: place.name,
         placeId: place.googlePlaceId,
         lat: place.lat,

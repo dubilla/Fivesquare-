@@ -14,8 +14,15 @@ vi.mock('@/lib/db/client', () => ({
   },
 }));
 
+vi.mock('@/lib/storage/photos', () => ({
+  deletePhotoObject: vi.fn(),
+  photoPublicUrl: (key: string | null) =>
+    key ? `/api/uploads/local?key=${encodeURIComponent(key)}` : null,
+}));
+
 import { auth } from '@/auth';
 import { db } from '@/lib/db/client';
+import { deletePhotoObject } from '@/lib/storage/photos';
 
 describe('DELETE /api/checkins/[id]', () => {
   beforeEach(() => {
@@ -100,6 +107,7 @@ describe('DELETE /api/checkins/[id]', () => {
       lng: -73.99,
       dishText: 'Pizza',
       noteText: null,
+      photoKey: 'checkins/user-123/photo.jpg',
       visitDatetime: new Date(),
       createdAt: new Date(),
       updatedAt: new Date(),
@@ -128,6 +136,9 @@ describe('DELETE /api/checkins/[id]', () => {
     expect(response.status).toBe(200);
     expect(data.success).toBe(true);
     expect(mockDelete.where).toHaveBeenCalled();
+    expect(deletePhotoObject).toHaveBeenCalledWith(
+      'checkins/user-123/photo.jpg'
+    );
   });
 
   it('should handle database errors', async () => {

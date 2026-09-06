@@ -3,6 +3,7 @@ import { auth } from '@/auth';
 import { db } from '@/lib/db/client';
 import { checkIns } from '@/lib/db/schema';
 import { VERDICTS, isVerdict } from '@/lib/verdict';
+import { deletePhotoObject, photoPublicUrl } from '@/lib/storage/photos';
 import { eq, and } from 'drizzle-orm';
 
 export async function DELETE(
@@ -17,10 +18,11 @@ export async function DELETE(
   try {
     const { id } = await params;
 
-    // Check if check-in exists and belongs to user. Explicit column so this
+    // Check if check-in exists and belongs to user. Explicit columns so this
     // query doesn't reference the deprecated denormalized columns (dropped S5b).
+    // photoKey is needed so we can delete the R2/local object after the row.
     const existing = await db
-      .select({ id: checkIns.id })
+      .select({ id: checkIns.id, photoKey: checkIns.photoKey })
       .from(checkIns)
       .where(and(eq(checkIns.id, id), eq(checkIns.userId, session.user.id)))
       .limit(1);
@@ -36,6 +38,17 @@ export async function DELETE(
     await db
       .delete(checkIns)
       .where(and(eq(checkIns.id, id), eq(checkIns.userId, session.user.id)));
+
+    // Orphan policy: check-in delete removes the object. Best-effort — a failed
+    // storage delete after a successful row delete leaves an orphaned object
+    // (same class of garbage as abandoned uploads). Log and still succeed.
+    if (existing[0].photoKey) {
+      try {
+        await deletePhotoObject(existing[0].photoKey);
+      } catch (err) {
+        console.error('Failed to delete photo object:', err);
+      }
+    }
 
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
@@ -66,6 +79,7 @@ export async function PUT(
     const body = await request.json();
     // Editing changes only dish/note/verdict; place isn't editable in the
     // product, so place fields are neither read nor written here anymore.
+    // Photo is create-only in S9 — no replace/clear on edit.
     const { dishText, noteText, verdict, visitDatetime } = body;
 
     // Check if check-in exists and belongs to user. Explicit columns (no
@@ -155,12 +169,16 @@ export async function PUT(
         dishText: checkIns.dishText,
         noteText: checkIns.noteText,
         verdict: checkIns.verdict,
+        photoKey: checkIns.photoKey,
         visitDatetime: checkIns.visitDatetime,
         createdAt: checkIns.createdAt,
         updatedAt: checkIns.updatedAt,
       });
 
-    return NextResponse.json(updated, { status: 200 });
+    return NextResponse.json(
+      { ...updated, photoUrl: photoPublicUrl(updated.photoKey) },
+      { status: 200 }
+    );
   } catch (error) {
     console.error('Error updating check-in:', error);
 

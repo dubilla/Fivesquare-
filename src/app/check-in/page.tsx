@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { PlacePicker } from '@/components/place-picker';
+import { PhotoPicker, type PhotoSelection } from '@/components/photo-picker';
 import { VerdictControl } from '@/components/verdict-control';
 import type { Verdict } from '@/lib/verdict';
 import type { Place } from '@/lib/places';
@@ -13,6 +14,7 @@ export default function CheckInPage() {
   const [dishText, setDishText] = useState('');
   const [noteText, setNoteText] = useState('');
   const [verdict, setVerdict] = useState<Verdict | null>(null);
+  const [photo, setPhoto] = useState<PhotoSelection | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,6 +55,7 @@ export default function CheckInPage() {
           dishText: dishText.trim(),
           noteText: noteText.trim() || null,
           verdict,
+          photoKey: photo?.photoKey ?? null,
           visitDatetime: new Date().toISOString(),
         }),
       });
@@ -148,6 +151,9 @@ export default function CheckInPage() {
               {noteCharsRemaining} characters remaining
             </div>
           </div>
+
+          {/* Dish photo (S9) — optional; uploaded before submit */}
+          <PhotoPicker value={photo} onChange={setPhoto} disabled={loading} />
 
           {/* Error Message */}
           {error && (

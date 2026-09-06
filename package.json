@@ -26,12 +26,15 @@
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.1",
     "@auth/pg-adapter": "^1.11.1",
+    "@aws-sdk/client-s3": "^3.1127.0",
+    "@aws-sdk/s3-request-presigner": "^3.1127.0",
     "@neondatabase/serverless": "^1.0.2",
     "bcrypt": "^6.0.0",
     "drizzle-orm": "^0.44.7",
     "maplibre-gl": "^5.24.0",
     "next": "15.5.15",
     "next-auth": "^5.0.0-beta.30",
+    "pg": "^8.23.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
@@ -44,6 +47,7 @@
     "@testing-library/user-event": "^14.6.1",
     "@types/bcrypt": "^6.0.0",
     "@types/node": "^20",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^5.1.0",

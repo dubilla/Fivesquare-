@@ -59,6 +59,7 @@ describe('Home (Landing Page)', () => {
     render(component);
 
     expect(screen.getByText('Log what you got')).toBeInTheDocument();
+    expect(screen.getByText(/snap a photo of the dish/i)).toBeInTheDocument();
     expect(screen.getByText('Find your usual')).toBeInTheDocument();
     expect(screen.getByText('Keep your history')).toBeInTheDocument();
   });

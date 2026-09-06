@@ -20,6 +20,11 @@ vi.mock('@/lib/db/client', () => ({
   },
 }));
 
+vi.mock('@/lib/storage/photos', () => ({
+  photoPublicUrl: (key: string | null) =>
+    key ? `/api/uploads/local?key=${encodeURIComponent(key)}` : null,
+}));
+
 import { auth } from '@/auth';
 import { db } from '@/lib/db/client';
 
@@ -493,5 +498,95 @@ describe('POST /api/checkins', () => {
 
     expect(response.status).toBe(201);
     expect(data.noteText).toBeNull();
+  });
+
+  it('stores a valid user-scoped photoKey', async () => {
+    (auth as Mock).mockResolvedValue({
+      user: { id: 'user-123', email: 'test@example.com' },
+      expires: '',
+    });
+
+    const photoKey = 'checkins/user-123/abc.jpg';
+    const mockCheckIn = {
+      id: 'checkin-123',
+      placeUuid: 'place-uuid-1',
+      dishText: 'Pizza',
+      noteText: null,
+      verdict: 'yes',
+      photoKey,
+      visitDatetime: new Date(),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const checkInValues = vi.fn().mockReturnValue({
+      returning: vi.fn().mockResolvedValue([mockCheckIn]),
+    });
+    (db.insert as Mock)
+      .mockReturnValueOnce({
+        values: vi.fn().mockReturnValue({
+          onConflictDoUpdate: vi.fn().mockReturnValue({
+            returning: vi.fn().mockResolvedValue([
+              {
+                id: 'place-uuid-1',
+                name: 'Test Restaurant',
+                googlePlaceId: 'place-abc',
+                lat: 40.73,
+                lng: -73.99,
+              },
+            ]),
+          }),
+        }),
+      })
+      .mockReturnValueOnce({ values: checkInValues });
+
+    const response = await POST(
+      new NextRequest('http://localhost/api/checkins', {
+        method: 'POST',
+        body: JSON.stringify({
+          placeId: 'place-abc',
+          placeName: 'Test Restaurant',
+          lat: 40.73,
+          lng: -73.99,
+          dishText: 'Pizza',
+          verdict: 'yes',
+          photoKey,
+        }),
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(201);
+    expect(data.photoKey).toBe(photoKey);
+    expect(data.photoUrl).toContain(encodeURIComponent(photoKey));
+    expect(checkInValues).toHaveBeenCalledWith(
+      expect.objectContaining({ photoKey })
+    );
+  });
+
+  it('rejects a photoKey scoped to another user', async () => {
+    (auth as Mock).mockResolvedValue({
+      user: { id: 'user-123', email: 'test@example.com' },
+      expires: '',
+    });
+
+    const response = await POST(
+      new NextRequest('http://localhost/api/checkins', {
+        method: 'POST',
+        body: JSON.stringify({
+          placeId: 'place-abc',
+          placeName: 'Test Restaurant',
+          lat: 40.73,
+          lng: -73.99,
+          dishText: 'Pizza',
+          verdict: 'yes',
+          photoKey: 'checkins/other-user/abc.jpg',
+        }),
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toMatch(/photoKey/i);
   });
 });
