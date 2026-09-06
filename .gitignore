@@ -33,6 +33,9 @@ yarn-error.log*
 # dev server logs (agent reads logs/dev.log)
 /logs
 
+# Local dish-photo uploads when R2 is not configured (S9)
+/.uploads
+
 # env files (can opt-in for committing if needed)
 .env*
 

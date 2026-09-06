@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { VerdictControl } from '@/components/verdict-control';
 import { VerdictBadge } from '@/components/verdict-badge';
+import { CheckInPhoto } from '@/components/check-in-photo';
 import { VERDICTS, verdictStyles, isVerdict } from '@/lib/verdict';
 import type { Verdict } from '@/lib/verdict';
 
@@ -19,6 +20,8 @@ interface CheckIn {
   dishText: string;
   noteText: string | null;
   verdict: Verdict | null;
+  photoKey: string | null;
+  photoUrl: string | null;
   visitDatetime: string;
   createdAt: string;
   updatedAt: string;
@@ -345,30 +348,38 @@ function HistoryView() {
                 key={checkIn.id}
                 className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 hover:shadow-md transition-shadow"
               >
-                <div className="flex justify-between items-start mb-3">
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
-                        {checkIn.dishText}
-                      </h2>
-                      {checkIn.verdict && (
-                        <VerdictBadge verdict={checkIn.verdict} />
+                <div className="flex justify-between items-start mb-3 gap-4">
+                  <div className="flex gap-4 min-w-0">
+                    {checkIn.photoUrl && (
+                      <CheckInPhoto
+                        src={checkIn.photoUrl}
+                        alt={checkIn.dishText}
+                      />
+                    )}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                          {checkIn.dishText}
+                        </h2>
+                        {checkIn.verdict && (
+                          <VerdictBadge verdict={checkIn.verdict} />
+                        )}
+                      </div>
+                      {checkIn.placeUuid ? (
+                        <a
+                          href={`/places/${checkIn.placeUuid}`}
+                          className="text-gray-600 dark:text-gray-400 mt-1 inline-block hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
+                        >
+                          {checkIn.placeName}
+                        </a>
+                      ) : (
+                        <p className="text-gray-600 dark:text-gray-400 mt-1">
+                          {checkIn.placeName ?? 'Unknown place'}
+                        </p>
                       )}
                     </div>
-                    {checkIn.placeUuid ? (
-                      <a
-                        href={`/places/${checkIn.placeUuid}`}
-                        className="text-gray-600 dark:text-gray-400 mt-1 inline-block hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
-                      >
-                        {checkIn.placeName}
-                      </a>
-                    ) : (
-                      <p className="text-gray-600 dark:text-gray-400 mt-1">
-                        {checkIn.placeName ?? 'Unknown place'}
-                      </p>
-                    )}
                   </div>
-                  <div className="text-right">
+                  <div className="text-right shrink-0">
                     <p className="text-sm text-gray-500 dark:text-gray-400">
                       {formatDate(checkIn.visitDatetime)}
                     </p>

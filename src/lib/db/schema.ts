@@ -135,6 +135,9 @@ export const checkIns = pgTable('check_ins', {
   dishText: varchar('dish_text', { length: 100 }).notNull(),
   noteText: varchar('note_text', { length: 500 }),
   verdict: verdictEnum('verdict'),
+  // S9: one dish photo per check-in. Object key in R2 (or local storage);
+  // nullable so existing rows and text-only check-ins stay valid.
+  photoKey: text('photo_key'),
   visitDatetime: timestamp('visit_datetime', {
     mode: 'date',
     withTimezone: true,

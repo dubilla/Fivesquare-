@@ -50,6 +50,13 @@
       "when": 1783909685188,
       "tag": "0006_common_siren",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788727581885,
+      "tag": "0007_checkin_photo_key",
+      "breakpoints": true
     }
   ]
 }

@@ -4,7 +4,9 @@ import { auth } from '@/auth';
 import { db } from '@/lib/db/client';
 import { checkIns, places } from '@/lib/db/schema';
 import { VerdictBadge } from '@/components/verdict-badge';
+import { CheckInPhoto } from '@/components/check-in-photo';
 import { rollupDishes } from '@/lib/dishes/rollup';
+import { photoPublicUrl } from '@/lib/storage/photos';
 
 // A place's page (S4/S5): leads with the dish summary — each dish you've
 // ordered here, grouped, with visit count and latest verdict ("should I get the
@@ -43,12 +45,13 @@ export default async function PlacePage({
   }
 
   // Explicit columns — no denormalized place columns (dropped at S5b).
-  const visits = await db
+  const visitRows = await db
     .select({
       id: checkIns.id,
       dishText: checkIns.dishText,
       noteText: checkIns.noteText,
       verdict: checkIns.verdict,
+      photoKey: checkIns.photoKey,
       visitDatetime: checkIns.visitDatetime,
     })
     .from(checkIns)
@@ -56,6 +59,11 @@ export default async function PlacePage({
       and(eq(checkIns.placeUuid, id), eq(checkIns.userId, session.user.id))
     )
     .orderBy(desc(checkIns.visitDatetime));
+
+  const visits = visitRows.map(v => ({
+    ...v,
+    photoUrl: photoPublicUrl(v.photoKey),
+  }));
 
   // Don't reveal places the user has never checked into.
   if (visits.length === 0) {
@@ -135,22 +143,31 @@ export default async function PlacePage({
               key={visit.id}
               className="bg-white dark:bg-gray-800 rounded-lg shadow p-6"
             >
-              <div className="flex justify-between items-start mb-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
-                    {visit.dishText}
-                  </h3>
-                  {visit.verdict && <VerdictBadge verdict={visit.verdict} />}
+              <div className="flex justify-between items-start mb-1 gap-4">
+                <div className="flex gap-4 min-w-0">
+                  {visit.photoUrl && (
+                    <CheckInPhoto src={visit.photoUrl} alt={visit.dishText} />
+                  )}
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                        {visit.dishText}
+                      </h3>
+                      {visit.verdict && (
+                        <VerdictBadge verdict={visit.verdict} />
+                      )}
+                    </div>
+                    {visit.noteText && (
+                      <p className="text-gray-700 dark:text-gray-300 mt-3">
+                        {visit.noteText}
+                      </p>
+                    )}
+                  </div>
                 </div>
-                <p className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap ml-2">
+                <p className="text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap ml-2 shrink-0">
                   {formatDate(visit.visitDatetime)}
                 </p>
               </div>
-              {visit.noteText && (
-                <p className="text-gray-700 dark:text-gray-300 mt-3">
-                  {visit.noteText}
-                </p>
-              )}
             </div>
           ))}
         </div>

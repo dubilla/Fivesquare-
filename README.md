@@ -7,6 +7,7 @@ Brand: **The Usual**. "Fivesquare" remains the in-house project/repo codename.
 ## Features
 
 - Check in at a place and record the dish you ordered
+- Add an optional photo of the dish
 - Add personal notes about your experience
 - View history of check-ins and venue visits
 - Search places with Google Places integration
