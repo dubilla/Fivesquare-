@@ -65,8 +65,18 @@ export function PlacePicker({
         }
       },
       error => {
-        setError(`Failed to get location: ${error.message}`);
+        // If the user denies geolocation (or it fails), fall back to a fixed
+        // downtown-SF point so place search still works — better than a dead form.
+        console.warn('Geolocation failed, using SF fallback:', error.message);
+        const fallback = { lat: 37.7749, lng: -122.4194 };
+        setLocation(fallback);
+        setError(
+          `Location unavailable (${error.message}). Searching near San Francisco.`
+        );
         setLoading(false);
+        if (query.trim()) {
+          searchPlaces(query, fallback);
+        }
       }
     );
   };
