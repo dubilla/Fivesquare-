@@ -20,6 +20,10 @@ interface PhotoPickerProps {
 /**
  * Optional single-photo picker for a check-in. Downscales, asks the API for a
  * presigned/local upload URL, PUTs the blob, then surfaces the storage key.
+ *
+ * Intentionally omits the HTML `capture` attribute so mobile browsers open the
+ * system picker with photo-library access (not camera-only). Users can still
+ * take a new photo from that sheet when the OS offers it.
  */
 export function PhotoPicker({ value, onChange, disabled }: PhotoPickerProps) {
   const inputId = useId();
@@ -120,6 +124,9 @@ export function PhotoPicker({ value, onChange, disabled }: PhotoPickerProps) {
       >
         Photo (optional)
       </label>
+      <p className="mb-2 text-sm text-gray-500 dark:text-gray-400">
+        Choose a photo from your library
+      </p>
 
       {value ? (
         <div className="relative inline-block">
@@ -145,7 +152,6 @@ export function PhotoPicker({ value, onChange, disabled }: PhotoPickerProps) {
             id={inputId}
             type="file"
             accept="image/jpeg,image/png,image/webp,image/gif"
-            capture="environment"
             disabled={disabled || uploading}
             onChange={e => void handleFile(e.target.files?.[0])}
             className="block w-full text-sm text-gray-600 dark:text-gray-400
