@@ -110,7 +110,29 @@ describe('POST /api/uploads/presign', () => {
       expect.objectContaining({
         userId: 'user-1',
         contentType: 'image/jpeg',
+        contentLength: 12345,
       })
     );
+  });
+
+  it('rejects non-integer contentLength', async () => {
+    (auth as Mock).mockResolvedValue({
+      user: { id: 'user-1', email: 'a@b.com' },
+      expires: '',
+    });
+
+    const response = await POST(
+      new NextRequest('http://localhost/api/uploads/presign', {
+        method: 'POST',
+        body: JSON.stringify({
+          contentType: 'image/jpeg',
+          contentLength: 12.5,
+        }),
+      })
+    );
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toMatch(/contentLength/i);
   });
 });
