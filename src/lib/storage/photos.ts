@@ -99,6 +99,8 @@ export function photoPublicUrl(
 export async function createPresignedUpload(options: {
   userId: string;
   contentType: PhotoContentType;
+  /** Exact byte length the client will PUT — signed into the R2 URL. */
+  contentLength: number;
   /** Absolute origin for local-driver upload URLs (e.g. http://localhost:3000). */
   origin: string;
 }): Promise<{ uploadUrl: string; photoKey: string; publicUrl: string }> {
@@ -106,12 +108,14 @@ export async function createPresignedUpload(options: {
 
   if (r2Configured()) {
     const client = getR2Client();
+    // ContentLength is part of the SigV4 signature: the subsequent PUT must
+    // send exactly this many bytes or R2 rejects it. That is what enforces the
+    // 10MB cap for direct-to-R2 uploads (presign already bounds contentLength).
     const command = new PutObjectCommand({
       Bucket: process.env.R2_BUCKET!,
       Key: photoKey,
       ContentType: options.contentType,
-      // Enforce size on the signed request when the client sends Content-Length.
-      // R2 still accepts smaller bodies; oversize is rejected client-side first.
+      ContentLength: options.contentLength,
     });
     const uploadUrl = await getSignedUrl(client, command, {
       expiresIn: 60 * 5,
@@ -124,6 +128,7 @@ export async function createPresignedUpload(options: {
   }
 
   // Local fallback — same shape as R2 so the client path is identical.
+  // Size is re-checked on PUT in writeLocalPhoto / the local route.
   const uploadUrl = `${options.origin}/api/uploads/local?key=${encodeURIComponent(photoKey)}`;
   return {
     uploadUrl,

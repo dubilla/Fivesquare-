@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import {
   buildPhotoKey,
   isPhotoContentType,
@@ -6,11 +6,50 @@ import {
   writeLocalPhoto,
   readLocalPhoto,
   deletePhotoObject,
+  createPresignedUpload,
 } from './photos';
 import { mkdir, rm } from 'fs/promises';
 import path from 'path';
 
+const putObjectInputs: unknown[] = [];
+
+vi.mock('@aws-sdk/client-s3', () => {
+  class PutObjectCommand {
+    input: unknown;
+    constructor(input: unknown) {
+      this.input = input;
+      putObjectInputs.push(input);
+    }
+  }
+  class DeleteObjectCommand {
+    input: unknown;
+    constructor(input: unknown) {
+      this.input = input;
+    }
+  }
+  class S3Client {
+    send = vi.fn();
+  }
+  return { PutObjectCommand, DeleteObjectCommand, S3Client };
+});
+
+vi.mock('@aws-sdk/s3-request-presigner', () => ({
+  getSignedUrl: vi.fn(async () => 'https://r2.example/presigned-put'),
+}));
+
 describe('photo storage helpers', () => {
+  beforeEach(() => {
+    putObjectInputs.length = 0;
+  });
+
+  afterEach(() => {
+    delete process.env.R2_ACCOUNT_ID;
+    delete process.env.R2_ACCESS_KEY_ID;
+    delete process.env.R2_SECRET_ACCESS_KEY;
+    delete process.env.R2_BUCKET;
+    delete process.env.R2_PUBLIC_URL;
+  });
+
   it('accepts only image content types', () => {
     expect(isPhotoContentType('image/jpeg')).toBe(true);
     expect(isPhotoContentType('image/png')).toBe(true);
@@ -24,19 +63,35 @@ describe('photo storage helpers', () => {
   });
 
   it('builds a local public URL when R2 is not configured', () => {
-    const prev = { ...process.env };
-    delete process.env.R2_ACCOUNT_ID;
-    delete process.env.R2_ACCESS_KEY_ID;
-    delete process.env.R2_SECRET_ACCESS_KEY;
-    delete process.env.R2_BUCKET;
-    delete process.env.R2_PUBLIC_URL;
-
     expect(photoPublicUrl('checkins/u/1.jpg')).toBe(
       '/api/uploads/local?key=checkins%2Fu%2F1.jpg'
     );
     expect(photoPublicUrl(null)).toBeNull();
+  });
 
-    process.env = prev;
+  it('signs ContentLength into R2 PutObject so size cannot be bypassed', async () => {
+    process.env.R2_ACCOUNT_ID = 'acct';
+    process.env.R2_ACCESS_KEY_ID = 'key';
+    process.env.R2_SECRET_ACCESS_KEY = 'secret';
+    process.env.R2_BUCKET = 'photos';
+    process.env.R2_PUBLIC_URL = 'https://cdn.example';
+
+    const result = await createPresignedUpload({
+      userId: 'user-1',
+      contentType: 'image/jpeg',
+      contentLength: 4096,
+      origin: 'http://localhost:3000',
+    });
+
+    expect(result.uploadUrl).toBe('https://r2.example/presigned-put');
+    expect(putObjectInputs).toHaveLength(1);
+    expect(putObjectInputs[0]).toEqual(
+      expect.objectContaining({
+        Bucket: 'photos',
+        ContentType: 'image/jpeg',
+        ContentLength: 4096,
+      })
+    );
   });
 
   it('writes, reads, and deletes local photo objects', async () => {

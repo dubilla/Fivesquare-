@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
 
     if (
       typeof contentLength !== 'number' ||
-      !Number.isFinite(contentLength) ||
+      !Number.isInteger(contentLength) ||
       contentLength <= 0 ||
       contentLength > PHOTO_MAX_BYTES
     ) {
@@ -56,6 +56,7 @@ export async function POST(request: NextRequest) {
     const result = await createPresignedUpload({
       userId: session.user.id,
       contentType,
+      contentLength,
       origin,
     });
 
