@@ -1,6 +1,9 @@
 import * as schema from './schema';
 import { neon } from '@neondatabase/serverless';
-import { drizzle as drizzleNeon } from 'drizzle-orm/neon-http';
+import {
+  drizzle as drizzleNeon,
+  type NeonHttpDatabase,
+} from 'drizzle-orm/neon-http';
 import { Pool } from 'pg';
 import { drizzle as drizzlePg } from 'drizzle-orm/node-postgres';
 
@@ -19,8 +22,14 @@ function isLocalPostgres(url: string) {
   }
 }
 
+// Neon HTTP is the production type. Local `pg` is cast to the same surface so
+// a Neon|Pg union doesn't collapse `.returning(selection)` to "0 args" (TS2554).
+type AppDb = NeonHttpDatabase<typeof schema>;
+
 // Neon serverless (HTTP) in production/preview; node-postgres against a local
 // Postgres so `pnpm dev` works without a Neon project (PostGIS still required).
-export const db = isLocalPostgres(connectionString)
-  ? drizzlePg(new Pool({ connectionString }), { schema })
-  : drizzleNeon(neon(connectionString), { schema });
+export const db: AppDb = (
+  isLocalPostgres(connectionString)
+    ? drizzlePg(new Pool({ connectionString }), { schema })
+    : drizzleNeon(neon(connectionString), { schema })
+) as AppDb;
